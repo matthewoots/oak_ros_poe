@@ -13,7 +13,8 @@ int main(int argc, char **argv)
 
     handler->getAllAvailableDeviceIds();
 
-    handler->init(nh, OakRosParams());
+    OakRosParams params;
+    handler->init(nh, params);
 
     spdlog::info("main exits cleanly");
 }

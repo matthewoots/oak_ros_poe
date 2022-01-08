@@ -8,19 +8,23 @@ void OakRos::init(ros::NodeHandle &nh, const OakRosParams &params)
 
     auto xoutLeft = m_pipeline.create<dai::node::XLinkOut>();
     auto xoutRight = m_pipeline.create<dai::node::XLinkOut>();
+    xoutLeft->setStreamName("left");
+    xoutRight->setStreamName("right");
+
     // auto xoutDisp = m_pipeline.create<dai::node::XLinkOut>();
     auto xoutDepth = m_pipeline.create<dai::node::XLinkOut>();
     // auto xoutRectifL = m_pipeline.create<dai::node::XLinkOut>();
     // auto xoutRectifR = m_pipeline.create<dai::node::XLinkOut>();
 
-    auto xoutColor = m_pipeline.create<dai::node::XLinkOut>();
-    auto colorMain = m_pipeline.create<dai::node::ColorCamera>();
+    // auto xoutColor = m_pipeline.create<dai::node::XLinkOut>();
+    // auto colorMain = m_pipeline.create<dai::node::ColorCamera>();
 
     // configure the stereo sensors' format
+    auto stereoDepth = m_pipeline.create<dai::node::StereoDepth>();
+    auto monoLeft = m_pipeline.create<dai::node::MonoCamera>();
+    auto monoRight = m_pipeline.create<dai::node::MonoCamera>();
     if (params.enable_stereo || params.enable_depth)
     {
-        auto monoLeft = m_pipeline.create<dai::node::MonoCamera>();
-        auto monoRight = m_pipeline.create<dai::node::MonoCamera>();
         
         monoLeft->setResolution(params.stereo_resolution);
         monoLeft->setBoardSocket(dai::CameraBoardSocket::LEFT);
@@ -30,18 +34,16 @@ void OakRos::init(ros::NodeHandle &nh, const OakRosParams &params)
         // direct link from sensor to output
         if (params.enable_stereo && !params.enable_depth)
         {
-            xoutLeft->setStreamName("left");
-            xoutRight->setStreamName("right");
-
             monoLeft->out.link(xoutLeft->input);
             monoRight->out.link(xoutRight->input);
 
         } // sensor to stereo unit before going to output
         else if (params.enable_depth)
         {
-            auto stereoDepth = params.enable_depth ? m_pipeline.create<dai::node::StereoDepth>() : nullptr;
+            
             if (params.enable_stereo)
             {
+                spdlog::info("enabling both depth and stereo streams...");
                 stereoDepth->setDefaultProfilePreset(dai::node::StereoDepth::PresetMode::HIGH_DENSITY);
                 stereoDepth->setRectifyEdgeFillColor(0); // black, to better see the cutout
                 // stereoDepth->setInputResolution(1280, 720);
@@ -74,23 +76,23 @@ void OakRos::init(ros::NodeHandle &nh, const OakRosParams &params)
         }
     }
 
-    if (params.enable_rgb)
-    {
-        xoutColor->setStreamName("rgb");
-    }
+    // if (params.enable_rgb)
+    // {
+    //     xoutColor->setStreamName("rgb");
+    // }
 
     spdlog::info("creating device");
 
-    dai::Device device = params.device_id.empty() ? dai::Device(m_pipeline) : dai::Device(m_pipeline, getDeviceInfo(params.device_id));
+    m_device = std::make_shared<dai::Device>(m_pipeline);
 
-    spdlog::info("device created");
+    spdlog::info("device created with speed {}", m_device->getUsbSpeed());
 
-    std::shared_ptr<dai::DataOutputQueue> leftQueue, rightQueue, depthQueue, rgbQueue;
-    if (params.enable_stereo)
-    {
-        leftQueue = device.getOutputQueue("left", 8, false);
-        rightQueue = device.getOutputQueue("right", 8, false);
-    }
+    // std::shared_ptr<dai::DataOutputQueue> leftQueue, rightQueue, depthQueue, rgbQueue;
+    // if (params.enable_stereo)
+    // {
+    //     leftQueue = device.getOutputQueue("left", 8, false);
+    //     rightQueue = device.getOutputQueue("right", 8, false);
+    // }
 
 }
 

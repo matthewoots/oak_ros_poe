@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
 project(oak_ros)
 
-# enable C++17 standard (current directory scope)
-set(CMAKE_CXX_STANDARD 17)
+# enable C++14 standard (current directory scope)
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # configure build types and build c-flags
@@ -33,17 +33,16 @@ if(depthai_FOUND)
                   ${depthai_DIR})
 endif()
 
-find_package(OpenCV REQUIRED)
+# find_package(OpenCV REQUIRED)
 
 # find_package(spdlog REQUIRED)
 
 # Build Executables Below
 
-include_directories(include ${catkin_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
+include_directories(include ${catkin_INCLUDE_DIRS})
 
 add_library(lib_oak_ros src/oak_ros/OakRos.cpp src/oak_ros/OakRosFactory.cpp)
-target_link_libraries(lib_oak_ros PRIVATE ${OpenCV_LIBS} depthai::core
-                                          depthai::opencv ${catkin_LIBRARIES})
+target_link_libraries(lib_oak_ros PUBLIC depthai::opencv ${catkin_LIBRARIES})
 
 # alias will make public dependencies go through
 add_library(lib_oak_ros::lib_oak_ros ALIAS lib_oak_ros)
@@ -53,5 +52,5 @@ add_executable(oak_ros src/main.cpp)
 # linking depthai::core for proper header includes, and spdlog dependencies
 target_link_libraries(oak_ros 
 PRIVATE
-depthai::core lib_oak_ros::lib_oak_ros ${catkin_LIBRARIES}
+lib_oak_ros::lib_oak_ros
 )
