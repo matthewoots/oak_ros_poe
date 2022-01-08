@@ -11,5 +11,16 @@ public:
 
     std::vector<std::string> getAllAvailableDeviceIds();
 
+    dai::DeviceInfo getDeviceInfo(const std::string& device_id);
+
 private:
+
+    dai::Pipeline m_pipeline;
+
+    std::shared_ptr<dai::node::MonoCamera> m_monoLeft, m_monoRight;
+    std::shared_ptr<dai::node::StereoDepth> m_stereoDepth;
+
+    std::shared_ptr<dai::node::ColorCamera> m_colorMain;
+
+    std::shared_ptr<dai::node::IMU> m_imu;
 };

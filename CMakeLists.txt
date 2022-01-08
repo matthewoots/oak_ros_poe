@@ -35,7 +35,7 @@ endif()
 
 find_package(OpenCV REQUIRED)
 
-find_package(spdlog REQUIRED)
+# find_package(spdlog REQUIRED)
 
 # Build Executables Below
 
@@ -49,4 +49,8 @@ target_link_libraries(lib_oak_ros PRIVATE ${OpenCV_LIBS} depthai::core
 add_library(lib_oak_ros::lib_oak_ros ALIAS lib_oak_ros)
 
 add_executable(oak_ros src/main.cpp)
-target_link_libraries(oak_ros lib_oak_ros::lib_oak_ros spdlog::spdlog)
+
+target_link_libraries(oak_ros 
+PRIVATE
+lib_oak_ros::lib_oak_ros  ${catkin_LIBRARIES}
+)
