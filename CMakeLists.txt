@@ -17,9 +17,13 @@ find_package(OpenCV 4 REQUIRED)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
+  sensor_msgs
   image_transport
   cv_bridge
+  pcl_conversions
+  pcl_ros
 )
+
 
 # running dependency
 catkin_package(
@@ -28,3 +32,27 @@ catkin_package(
   # CATKIN_DEPENDS imu_vn_100
   # DEPENDS
 )
+
+# Finding depthai dependencies
+set(depthai_DIR "/home/ubuntu/git/depthai-core/build/install/lib/cmake/depthai")
+
+find_package(depthai CONFIG REQUIRED)
+if(depthai_FOUND)
+  message(WARNING "depthai FOUND, Version:" ${depthai_VERSION} " directory: " ${depthai_DIR})
+endif()
+
+find_package(OpenCV REQUIRED)
+
+find_package(spdlog REQUIRED)
+
+
+# Build Executables Below
+
+include_directories(
+  include
+  ${catkin_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
+)
+
+add_library(lib_oak_ros src/oak_ros/OakRos.cpp)
+target_link_libraries(lib_oak_ros ${catkin_LIBRARIES} ${OpenCV_LIBS} depthai::core depthai::opencv spdlog::spdlog)
