@@ -17,8 +17,9 @@ class OakRosInterface
 public:
     typedef std::shared_ptr<OakRosInterface> Ptr;
 
-    virtual void init(ros::NodeHandle& nh, const OakRosParams& params) = 0;
+    virtual void init(ros::NodeHandle &nh, const OakRosParams &params) = 0;
+
+    virtual std::vector<std::string> getAllAvailableDeviceIds() = 0;
 
 protected:
-
 };

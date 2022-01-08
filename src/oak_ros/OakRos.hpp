@@ -7,7 +7,9 @@
 class OakRos : public OakRosInterface
 {
 public:
-    void init(ros::NodeHandle& nh, const OakRosParams& params);
+    void init(ros::NodeHandle &nh, const OakRosParams &params);
+
+    std::vector<std::string> getAllAvailableDeviceIds();
 
 private:
 };

@@ -2,7 +2,7 @@
 
 #include "OakRos.hpp"
 
-OakRosInterface::Ptr getOakRosHandler()
+OakRosInterface::Ptr OakRosFactory::getOakRosHandler()
 {
     return std::make_shared<OakRos>();
 }

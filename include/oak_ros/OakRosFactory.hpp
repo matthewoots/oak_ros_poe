@@ -5,5 +5,5 @@
 class OakRosFactory
 {
 public:
-    OakRosInterface::Ptr getOakRosHandler();
+    static OakRosInterface::Ptr getOakRosHandler();
 };
