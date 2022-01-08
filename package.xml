@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<package format="2">
+    <name>oak_ros</name>
+    <version>0.1.0</version>
+    <description>The oak_ros package</description>
+    <maintainer email="huimin@todo.todo">huimin</maintainer>
+    <license>TODO</license>
+
+    <buildtool_depend>catkin</buildtool_depend>
+
+</package>
