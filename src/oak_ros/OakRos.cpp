@@ -22,10 +22,9 @@ void OakRos::init(ros::NodeHandle &nh, const OakRosParams &params)
         auto monoLeft = m_pipeline.create<dai::node::MonoCamera>();
         auto monoRight = m_pipeline.create<dai::node::MonoCamera>();
         
-        auto resolution = static_cast<dai::MonoCameraProperties::SensorResolution>(params.stereo_resolution);
-        monoLeft->setResolution(resolution);
+        monoLeft->setResolution(params.stereo_resolution);
         monoLeft->setBoardSocket(dai::CameraBoardSocket::LEFT);
-        monoRight->setResolution(resolution);
+        monoRight->setResolution(params.stereo_resolution);
         monoRight->setBoardSocket(dai::CameraBoardSocket::RIGHT);
 
         // direct link from sensor to output

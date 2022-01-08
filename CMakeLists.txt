@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # configure build types and build c-flags
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE
-      Release
+      Debug
       CACHE STRING "Choose the type of build." FORCE)
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release"
                                                "MinSizeRel" "RelWithDebInfo")
@@ -50,7 +50,8 @@ add_library(lib_oak_ros::lib_oak_ros ALIAS lib_oak_ros)
 
 add_executable(oak_ros src/main.cpp)
 
+# linking depthai::core for proper header includes, and spdlog dependencies
 target_link_libraries(oak_ros 
 PRIVATE
-lib_oak_ros::lib_oak_ros  ${catkin_LIBRARIES}
+depthai::core lib_oak_ros::lib_oak_ros ${catkin_LIBRARIES}
 )
