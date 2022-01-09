@@ -12,6 +12,7 @@
 struct OakRosParams
 {
     std::string device_id;
+    std::string topic_name = "oak";
     bool enable_stereo = true;
     bool enable_stereo_rectified = true;
     dai::MonoCameraProperties::SensorResolution stereo_resolution = dai::MonoCameraProperties::SensorResolution::THE_480_P;

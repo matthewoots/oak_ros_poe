@@ -9,6 +9,7 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
     spdlog::info("initialising device {}", params.device_id);
 
     m_device_id = params.device_id;
+    m_topic_name = params.topic_name;
 
     auto xoutLeft = m_pipeline.create<dai::node::XLinkOut>();
     auto xoutRight = m_pipeline.create<dai::node::XLinkOut>();
@@ -32,8 +33,6 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
 
     // ROS-related
     m_imageTransport = std::make_shared<image_transport::ImageTransport>(nh);
-
-    spdlog::info("check1");
 
     if (params.enable_stereo || params.enable_depth)
     {
@@ -117,8 +116,8 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
         rightQueue = m_device->getOutputQueue("right", 8, false);
 
         spdlog::info("advertising stereo cameras in ros topics...");
-        m_leftPub.reset(new auto(m_imageTransport->advertiseCamera("left/image_rect_raw", 3)));
-        m_rightPub.reset(new auto(m_imageTransport->advertiseCamera("right/image_rect_raw", 3)));
+        m_leftPub.reset(new auto(m_imageTransport->advertiseCamera(m_topic_name + "/left/image_rect_raw", 3)));
+        m_rightPub.reset(new auto(m_imageTransport->advertiseCamera(m_topic_name + "/right/image_rect_raw", 3)));
     }
 
     if (params.enable_depth)

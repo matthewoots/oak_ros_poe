@@ -34,6 +34,7 @@ private:
 
     bool m_running;
     std::string m_device_id;
+    std::string m_topic_name;
 
     dai::Pipeline m_pipeline;
 
