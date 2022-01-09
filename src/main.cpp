@@ -14,6 +14,9 @@ int main(int argc, char **argv)
     handler->getAllAvailableDeviceIds();
 
     OakRosParams params;
+
+    params.enable_stereo = true;
+    params.enable_depth = false;
     handler->init(nh, params);
 
     spdlog::info("main exits cleanly");

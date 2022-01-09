@@ -13,6 +13,7 @@ void OakRos::init(ros::NodeHandle &nh, const OakRosParams &params)
 
     // auto xoutDisp = m_pipeline.create<dai::node::XLinkOut>();
     auto xoutDepth = m_pipeline.create<dai::node::XLinkOut>();
+    xoutDepth->setStreamName("depth");
     // auto xoutRectifL = m_pipeline.create<dai::node::XLinkOut>();
     // auto xoutRectifR = m_pipeline.create<dai::node::XLinkOut>();
 
@@ -20,7 +21,7 @@ void OakRos::init(ros::NodeHandle &nh, const OakRosParams &params)
     // auto colorMain = m_pipeline.create<dai::node::ColorCamera>();
 
     // configure the stereo sensors' format
-    auto stereoDepth = m_pipeline.create<dai::node::StereoDepth>();
+    // auto stereoDepth = m_pipeline.create<dai::node::StereoDepth>();
     auto monoLeft = m_pipeline.create<dai::node::MonoCamera>();
     auto monoRight = m_pipeline.create<dai::node::MonoCamera>();
     if (params.enable_stereo || params.enable_depth)
@@ -34,46 +35,47 @@ void OakRos::init(ros::NodeHandle &nh, const OakRosParams &params)
         // direct link from sensor to output
         if (params.enable_stereo && !params.enable_depth)
         {
+            spdlog::info("enabling both only raw stereo...");
             monoLeft->out.link(xoutLeft->input);
             monoRight->out.link(xoutRight->input);
 
         } // sensor to stereo unit before going to output
-        else if (params.enable_depth)
-        {
+        // else if (params.enable_depth)
+        // {
             
-            if (params.enable_stereo)
-            {
-                spdlog::info("enabling both depth and stereo streams...");
-                stereoDepth->setDefaultProfilePreset(dai::node::StereoDepth::PresetMode::HIGH_DENSITY);
-                stereoDepth->setRectifyEdgeFillColor(0); // black, to better see the cutout
-                // stereoDepth->setInputResolution(1280, 720);
-                stereoDepth->initialConfig.setMedianFilter(dai::MedianFilter::KERNEL_5x5);
-                stereoDepth->setLeftRightCheck(true);
-                stereoDepth->setExtendedDisparity(false);
-                stereoDepth->setSubpixel(false);
+        //     if (params.enable_stereo)
+        //     {
+        //         spdlog::info("enabling both depth and stereo streams...");
+        //         stereoDepth->setDefaultProfilePreset(dai::node::StereoDepth::PresetMode::HIGH_DENSITY);
+        //         stereoDepth->setRectifyEdgeFillColor(0); // black, to better see the cutout
+        //         // stereoDepth->setInputResolution(1280, 720);
+        //         stereoDepth->initialConfig.setMedianFilter(dai::MedianFilter::KERNEL_5x5);
+        //         stereoDepth->setLeftRightCheck(true);
+        //         stereoDepth->setExtendedDisparity(false);
+        //         stereoDepth->setSubpixel(false);
 
-                // Linking
-                monoLeft->out.link(stereoDepth->left);
-                monoRight->out.link(stereoDepth->right);
+        //         // Linking
+        //         monoLeft->out.link(stereoDepth->left);
+        //         monoRight->out.link(stereoDepth->right);
 
-                if (!params.enable_stereo_rectified)
-                {
-                    // output raw images
-                    stereoDepth->syncedLeft.link(xoutLeft->input);
-                    stereoDepth->syncedRight.link(xoutRight->input);
-                }
-                else
-                {
-                    // output rectified images
-                    stereoDepth->rectifiedLeft.link(xoutLeft->input);
-                    stereoDepth->rectifiedRight.link(xoutRight->input);
-                }
-            }
-            else
-            {
-                throw std::runtime_error("not implemented for enabled depth, but disabled stereo");
-            }
-        }
+        //         if (!params.enable_stereo_rectified)
+        //         {
+        //             // output raw images
+        //             stereoDepth->syncedLeft.link(xoutLeft->input);
+        //             stereoDepth->syncedRight.link(xoutRight->input);
+        //         }
+        //         else
+        //         {
+        //             // output rectified images
+        //             stereoDepth->rectifiedLeft.link(xoutLeft->input);
+        //             stereoDepth->rectifiedRight.link(xoutRight->input);
+        //         }
+        //     }
+        //     else
+        //     {
+        //         throw std::runtime_error("not implemented for enabled depth, but disabled stereo");
+        //     }
+        // }
     }
 
     // if (params.enable_rgb)
@@ -87,13 +89,18 @@ void OakRos::init(ros::NodeHandle &nh, const OakRosParams &params)
 
     spdlog::info("device created with speed {}", m_device->getUsbSpeed());
 
-    // std::shared_ptr<dai::DataOutputQueue> leftQueue, rightQueue, depthQueue, rgbQueue;
-    // if (params.enable_stereo)
-    // {
-    //     leftQueue = device.getOutputQueue("left", 8, false);
-    //     rightQueue = device.getOutputQueue("right", 8, false);
-    // }
+    
+    if (params.enable_stereo)
+    {
+        leftQueue = m_device->getOutputQueue("left", 8, false);
+        rightQueue = m_device->getOutputQueue("right", 8, false);
+    }
 
+    // while(1)
+    // {
+    //     auto left = leftQueue->get<dai::ImgFrame>();
+    //     auto right = rightQueue->get<dai::ImgFrame>();
+    // }
 }
 
 std::vector<std::string> OakRos::getAllAvailableDeviceIds()

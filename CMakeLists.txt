@@ -54,3 +54,9 @@ target_link_libraries(oak_ros
 PRIVATE
 lib_oak_ros::lib_oak_ros
 )
+
+add_executable(test_stereo_depth_video test/test_stereo_depth_video.cpp)
+target_link_libraries(test_stereo_depth_video 
+PRIVATE
+lib_oak_ros::lib_oak_ros
+)
