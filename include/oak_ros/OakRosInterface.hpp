@@ -31,7 +31,5 @@ public:
 
     virtual void init(ros::NodeHandle &nh, const OakRosParams &params) = 0;
 
-    virtual std::vector<std::string> getAllAvailableDeviceIds() = 0;
-
 protected:
 };

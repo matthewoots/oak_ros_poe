@@ -9,15 +9,24 @@ int main(int argc, char **argv)
     ros::NodeHandle nh;
     ros::NodeHandle nh_local("~");
 
-    auto handler = OakRosFactory::getOakRosHandler();
+    auto device_ids = OakRosFactory::getAllAvailableDeviceIds();
 
-    handler->getAllAvailableDeviceIds();
+    std::vector<OakRosInterface::Ptr> oak_handlers;
 
-    OakRosParams params;
+    for (auto& id : device_ids)
+    {
+        spdlog::info("main: start device with id {}", id);
+        
+        OakRosInterface::Ptr handler = oak_handlers.emplace_back(OakRosFactory::getOakRosHandler());
+        OakRosParams params;
 
-    params.enable_stereo = true;
-    params.enable_depth = false;
-    handler->init(nh, params);
+        params.device_id = id;
+        params.enable_stereo = true;
+        params.enable_depth = false;
+        handler->init(nh, params);
+    }
+
+    ros::spin();
 
     spdlog::info("main exits cleanly");
 }
