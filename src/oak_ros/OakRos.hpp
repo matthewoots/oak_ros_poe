@@ -23,7 +23,7 @@ public:
         if (m_run.joinable())
             m_run.join();
 
-        spdlog::info("OakRos class destructor done.");
+        spdlog::info("{} OakRos class destructor done.", m_device_id);
     }
 
 private:
@@ -45,4 +45,6 @@ private:
 
     std::thread m_run;
     void run();
+
+    void depthCallback(std::shared_ptr<dai::ADatatype> data);
 };

@@ -1,5 +1,7 @@
 #include "OakRos.hpp"
 
+#include <chrono>
+
 void OakRos::init(ros::NodeHandle &nh, const OakRosParams &params)
 {
     spdlog::info("initialising device {}", params.device_id);
@@ -42,6 +44,9 @@ void OakRos::init(ros::NodeHandle &nh, const OakRosParams &params)
         } // sensor to stereo unit before going to output
         else if (params.enable_depth)
         {
+
+            stereoDepth->depth.link(xoutDepth->input);
+
             if (params.enable_stereo)
             {
                 spdlog::info("enabling both depth and stereo streams...");
@@ -103,6 +108,11 @@ void OakRos::init(ros::NodeHandle &nh, const OakRosParams &params)
         rightQueue = m_device->getOutputQueue("right", 8, false);
     }
 
+    if (params.enable_depth)
+    {
+        depthQueue = m_device->getOutputQueue("depth", 8, false);
+    }
+
     m_run = std::thread(&OakRos::run, this);
 }
 
@@ -110,24 +120,68 @@ void OakRos::run()
 {
     m_running = true;
 
-    spdlog::info("OakRos running");
+    spdlog::info("{} OakRos running now", m_device_id);
+
+    dai::DataOutputQueue::CallbackId depthCallbackId;
+    
+    if (depthQueue.get())
+        depthCallbackId = depthQueue->addCallback(std::bind(&OakRos::depthCallback, this, std::placeholders::_1));
 
     while (m_running)
     {
-        auto left = leftQueue->get<dai::ImgFrame>();
-        auto right = rightQueue->get<dai::ImgFrame>();
 
-        unsigned int seqLeft = left->getSequenceNum();
-        unsigned int seqRight = right->getSequenceNum();
+        // process stereo data
+        if (leftQueue.get() && rightQueue.get())
+        {
+            unsigned int seqLeft, seqRight;
 
-        double tsLeft = left->getTimestamp().time_since_epoch().count() / 1.0e9;
-        double tsRight = right->getTimestamp().time_since_epoch().count() / 1.0e9;
+            std::shared_ptr<dai::ImgFrame> left, right;
 
-        spdlog::info("{} left seq = {}, ts = {}", m_device_id, seqLeft, tsLeft);
-        spdlog::info("{} right seq = {}, ts = {}", m_device_id, seqRight, tsRight);
+            left = leftQueue->get<dai::ImgFrame>();
+            seqLeft = left->getSequenceNum();
+
+            right = rightQueue->get<dai::ImgFrame>();
+            seqRight = right->getSequenceNum();
+            
+            while (seqRight != seqLeft)
+            {
+                spdlog::warn("sequence number mismatch, skip frame. seqLeft = {}, seqRight = {}", seqLeft, seqRight);
+
+                if (seqRight < seqLeft)
+                {
+                    right = rightQueue->get<dai::ImgFrame>();
+                    seqRight = right->getSequenceNum();
+                }else
+                {
+                    left = leftQueue->get<dai::ImgFrame>();
+                    seqLeft = left->getSequenceNum();
+                }
+            }
+
+            double tsLeft = left->getTimestamp().time_since_epoch().count() / 1.0e9;
+            double tsRight = right->getTimestamp().time_since_epoch().count() / 1.0e9;
+
+            spdlog::info("{} left seq = {}, ts = {}", m_device_id, seqLeft, tsLeft);
+            spdlog::info("{} right seq = {}, ts = {}", m_device_id, seqRight, tsRight);
+        }else
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
     }
 
-    spdlog::info("OakRos quitting");
+    if (depthQueue.get())
+        depthQueue->removeCallback(depthCallbackId);
+
+    spdlog::info("{} OakRos quitting", m_device_id);
+}
+
+void OakRos::depthCallback(std::shared_ptr<dai::ADatatype> data)
+{
+    std::shared_ptr<dai::ImgFrame> depthFrame = std::static_pointer_cast<dai::ImgFrame>(data);
+
+    unsigned int seq = depthFrame->getSequenceNum();
+    double ts = depthFrame->getTimestamp().time_since_epoch().count() / 1.0e9;
+
+    spdlog::info("{} depth seq = {}, ts = {}", m_device_id, seq, ts);
 }
 
 dai::DeviceInfo OakRos::getDeviceInfo(const std::string& device_id)
