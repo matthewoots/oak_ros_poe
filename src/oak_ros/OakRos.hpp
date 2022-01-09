@@ -8,10 +8,14 @@
 
 #include <oak_ros/OakRosInterface.hpp>
 
+#include <ros/ros.h>
+#include <sensor_msgs/CameraInfo.h>
+#include <image_transport/image_transport.h>
+
 class OakRos : public OakRosInterface
 {
 public:
-    void init(ros::NodeHandle &nh, const OakRosParams &params);
+    void init(const ros::NodeHandle &nh, const OakRosParams &params);
 
     static std::vector<std::string> getAllAvailableDeviceIds();
 
@@ -47,4 +51,10 @@ private:
     void run();
 
     void depthCallback(std::shared_ptr<dai::ADatatype> data);
+
+    // ROS related functionalities
+    // ros::NodeHandle m_nh;
+    std::shared_ptr<image_transport::ImageTransport> m_imageTransport;
+    std::shared_ptr<image_transport::CameraPublisher> m_leftPub, m_rightPub;
+
 };

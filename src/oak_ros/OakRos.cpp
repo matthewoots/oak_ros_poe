@@ -2,7 +2,9 @@
 
 #include <chrono>
 
-void OakRos::init(ros::NodeHandle &nh, const OakRosParams &params)
+#include <cv_bridge/cv_bridge.h>
+
+void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
 {
     spdlog::info("initialising device {}", params.device_id);
 
@@ -26,6 +28,13 @@ void OakRos::init(ros::NodeHandle &nh, const OakRosParams &params)
     auto stereoDepth = m_pipeline.create<dai::node::StereoDepth>();
     auto monoLeft = m_pipeline.create<dai::node::MonoCamera>();
     auto monoRight = m_pipeline.create<dai::node::MonoCamera>();
+
+
+    // ROS-related
+    m_imageTransport = std::make_shared<image_transport::ImageTransport>(nh);
+
+    spdlog::info("check1");
+
     if (params.enable_stereo || params.enable_depth)
     {
         
@@ -106,6 +115,10 @@ void OakRos::init(ros::NodeHandle &nh, const OakRosParams &params)
     {
         leftQueue = m_device->getOutputQueue("left", 8, false);
         rightQueue = m_device->getOutputQueue("right", 8, false);
+
+        spdlog::info("advertising stereo cameras in ros topics...");
+        m_leftPub.reset(new auto(m_imageTransport->advertiseCamera("left/image_rect_raw", 3)));
+        m_rightPub.reset(new auto(m_imageTransport->advertiseCamera("right/image_rect_raw", 3)));
     }
 
     if (params.enable_depth)
@@ -129,6 +142,7 @@ void OakRos::run()
 
     while (m_running)
     {
+        cv::Mat leftCvFrame, rightCvFrame;
 
         // process stereo data
         if (leftQueue.get() && rightQueue.get())
@@ -161,8 +175,40 @@ void OakRos::run()
             double tsLeft = left->getTimestamp().time_since_epoch().count() / 1.0e9;
             double tsRight = right->getTimestamp().time_since_epoch().count() / 1.0e9;
 
-            spdlog::info("{} left seq = {}, ts = {}", m_device_id, seqLeft, tsLeft);
-            spdlog::info("{} right seq = {}, ts = {}", m_device_id, seqRight, tsRight);
+            spdlog::debug("{} left seq = {}, ts = {}", m_device_id, seqLeft, tsLeft);
+            spdlog::debug("{} right seq = {}, ts = {}", m_device_id, seqRight, tsRight);
+
+            // publish left frame and camera info
+            {
+                leftCvFrame = left->getFrame();
+
+                std_msgs::Header header;
+                header.stamp = ros::Time().fromSec(tsLeft);
+
+                sensor_msgs::CameraInfo cameraInfo;
+                cameraInfo.header = header;
+
+                cameraInfo.height = left->getWidth();
+                cameraInfo.width = left->getHeight();
+
+                cameraInfo.distortion_model = "opencv";
+
+
+                cv_bridge::CvImage leftBridge = cv_bridge::CvImage(header, sensor_msgs::image_encodings::MONO8, leftCvFrame);
+
+                m_leftPub->publish(*leftBridge.toImageMsg(), cameraInfo);
+            }
+
+            // publish right frame and camera info
+            {
+                rightCvFrame = right->getFrame();
+            }
+
+            
+            
+            
+            
+
         }else
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
@@ -181,7 +227,7 @@ void OakRos::depthCallback(std::shared_ptr<dai::ADatatype> data)
     unsigned int seq = depthFrame->getSequenceNum();
     double ts = depthFrame->getTimestamp().time_since_epoch().count() / 1.0e9;
 
-    spdlog::info("{} depth seq = {}, ts = {}", m_device_id, seq, ts);
+    spdlog::debug("{} depth seq = {}, ts = {}", m_device_id, seq, ts);
 }
 
 dai::DeviceInfo OakRos::getDeviceInfo(const std::string& device_id)

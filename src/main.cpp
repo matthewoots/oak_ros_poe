@@ -23,7 +23,7 @@ int main(int argc, char **argv)
         params.device_id = id;
         params.enable_stereo = true;
         params.enable_depth = true;
-        handler->init(nh, params);
+        handler->init(nh_local, params);
     }
 
     ros::spin();
