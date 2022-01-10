@@ -24,7 +24,7 @@ int main(int argc, char **argv)
         params.device_id = id;
         params.topic_name = "oak" + std::to_string(topic_name_seq);
         params.enable_stereo = true;
-        params.enable_depth = true;
+        params.enable_depth = false;
         handler->init(nh_local, params);
 
         topic_name_seq++;
