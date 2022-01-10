@@ -201,11 +201,23 @@ void OakRos::run()
             // publish right frame and camera info
             {
                 rightCvFrame = right->getFrame();
-            }
 
-            
-            
-            
+                std_msgs::Header header;
+                header.stamp = ros::Time().fromSec(tsRight);
+
+                sensor_msgs::CameraInfo cameraInfo;
+                cameraInfo.header = header;
+
+                cameraInfo.height = right->getWidth();
+                cameraInfo.width = right->getHeight();
+
+                cameraInfo.distortion_model = "opencv";
+
+
+                cv_bridge::CvImage rightBridge = cv_bridge::CvImage(header, sensor_msgs::image_encodings::MONO8, rightCvFrame);
+
+                m_rightPub->publish(*rightBridge.toImageMsg(), cameraInfo);
+            }
             
 
         }else
