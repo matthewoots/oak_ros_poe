@@ -60,3 +60,9 @@ target_link_libraries(test_stereo_depth_video
 PRIVATE
 lib_oak_ros::lib_oak_ros
 )
+
+add_executable(test_calibration_reader test/test_calibration_reader.cpp)
+target_link_libraries(test_calibration_reader 
+PRIVATE
+lib_oak_ros::lib_oak_ros
+)
