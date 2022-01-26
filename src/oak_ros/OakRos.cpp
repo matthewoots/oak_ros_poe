@@ -10,6 +10,7 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
 
     m_device_id = params.device_id;
     m_topic_name = params.topic_name;
+    m_stereo_is_rectified = false;
 
     auto xoutLeft = m_pipeline.create<dai::node::XLinkOut>();
     auto xoutRight = m_pipeline.create<dai::node::XLinkOut>();
@@ -81,6 +82,7 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
                     // output rectified images
                     stereoDepth->rectifiedLeft.link(xoutLeft->input);
                     stereoDepth->rectifiedRight.link(xoutRight->input);
+                    m_stereo_is_rectified = true;
                 }
             }
             else
@@ -139,10 +141,12 @@ void OakRos::run()
     if (depthQueue.get())
         depthCallbackId = depthQueue->addCallback(std::bind(&OakRos::depthCallback, this, std::placeholders::_1));
 
+
+    cv::Mat leftCvFrame, rightCvFrame;
+    sensor_msgs::CameraInfo leftCameraInfo, rightCameraInfo;
+
     while (m_running)
     {
-        cv::Mat leftCvFrame, rightCvFrame;
-
         // process stereo data
         if (leftQueue.get() && rightQueue.get())
         {
@@ -171,6 +175,25 @@ void OakRos::run()
                 }
             }
 
+            // Here we have make sure the stereo have the same sequence number. According to OAK, this ensures synchronisation
+
+            // initialise camera_info msgs if needed
+            if (leftCameraInfo.width != left->getWidth() || rightCameraInfo.width != right->getWidth())
+            {
+                spdlog::info("{} Initialise camera_info messages, rectification = {}", m_device_id, m_stereo_is_rectified ? "Enabled" : "Disabled");
+                
+                if (!m_stereo_is_rectified)
+                {
+                    leftCameraInfo = getCameraInfo(left, dai::CameraBoardSocket::LEFT);
+                    rightCameraInfo = getCameraInfo(right, dai::CameraBoardSocket::RIGHT);
+                }else
+                {
+                    leftCameraInfo = getCameraInfo(right, dai::CameraBoardSocket::RIGHT); // after rectification in OAK, the intrinsics of left will be the same as the right
+                    rightCameraInfo = getCameraInfo(right, dai::CameraBoardSocket::RIGHT);
+                }
+                
+            }
+
             double tsLeft = left->getTimestamp().time_since_epoch().count() / 1.0e9;
             double tsRight = right->getTimestamp().time_since_epoch().count() / 1.0e9;
 
@@ -181,42 +204,20 @@ void OakRos::run()
             {
                 leftCvFrame = left->getFrame();
 
-                std_msgs::Header header;
-                header.stamp = ros::Time().fromSec(tsLeft);
+                leftCameraInfo.header.stamp = ros::Time().fromSec(tsLeft);
+                cv_bridge::CvImage leftBridge = cv_bridge::CvImage(leftCameraInfo.header, sensor_msgs::image_encodings::MONO8, leftCvFrame);
 
-                sensor_msgs::CameraInfo cameraInfo;
-                cameraInfo.header = header;
-
-                cameraInfo.height = left->getWidth();
-                cameraInfo.width = left->getHeight();
-
-                cameraInfo.distortion_model = "opencv";
-
-
-                cv_bridge::CvImage leftBridge = cv_bridge::CvImage(header, sensor_msgs::image_encodings::MONO8, leftCvFrame);
-
-                m_leftPub->publish(*leftBridge.toImageMsg(), cameraInfo);
+                m_leftPub->publish(*leftBridge.toImageMsg(), leftCameraInfo);
             }
 
             // publish right frame and camera info
             {
                 rightCvFrame = right->getFrame();
 
-                std_msgs::Header header;
-                header.stamp = ros::Time().fromSec(tsRight);
+                rightCameraInfo.header.stamp = ros::Time().fromSec(tsRight);
+                cv_bridge::CvImage rightBridge = cv_bridge::CvImage(rightCameraInfo.header, sensor_msgs::image_encodings::MONO8, rightCvFrame);
 
-                sensor_msgs::CameraInfo cameraInfo;
-                cameraInfo.header = header;
-
-                cameraInfo.height = right->getWidth();
-                cameraInfo.width = right->getHeight();
-
-                cameraInfo.distortion_model = "opencv";
-
-
-                cv_bridge::CvImage rightBridge = cv_bridge::CvImage(header, sensor_msgs::image_encodings::MONO8, rightCvFrame);
-
-                m_rightPub->publish(*rightBridge.toImageMsg(), cameraInfo);
+                m_rightPub->publish(*rightBridge.toImageMsg(), rightCameraInfo);
             }
             
 
@@ -239,6 +240,37 @@ void OakRos::depthCallback(std::shared_ptr<dai::ADatatype> data)
     double ts = depthFrame->getTimestamp().time_since_epoch().count() / 1.0e9;
 
     spdlog::debug("{} depth seq = {}, ts = {}", m_device_id, seq, ts);
+}
+
+sensor_msgs::CameraInfo OakRos::getCameraInfo(std::shared_ptr<dai::ImgFrame> img, dai::CameraBoardSocket socket)
+{
+    sensor_msgs::CameraInfo info;
+
+    std::vector<double> flatIntrinsics, distCoeffsDouble;
+
+    dai::CalibrationHandler calibData = m_device->readCalibration();
+
+    std::vector<std::vector<float>> intrinsics, extrinsics;
+    intrinsics = calibData.getCameraIntrinsics(socket);
+    // extrinsics = calibData.getCameraExtrinsics(dai::CameraBoardSocket::RIGHT, socket);
+
+    // fill in K
+    flatIntrinsics.resize(9);
+    for(int i = 0; i < 3; i++) {
+        std::copy(intrinsics[i].begin(), intrinsics[i].end(), flatIntrinsics.begin() + 3 * i);
+    }
+
+    std::copy(flatIntrinsics.begin(), flatIntrinsics.end(), info.K.begin());
+
+    // TODO: fill in P
+
+    info.width = static_cast<uint32_t>(img->getWidth());
+    info.height = static_cast<uint32_t>(img->getHeight());
+
+    // undistrotion is always done in OAK camera, so distortion coefficient should be zero always
+    info.distortion_model = "opencv";
+
+    return info;
 }
 
 dai::DeviceInfo OakRos::getDeviceInfo(const std::string& device_id)

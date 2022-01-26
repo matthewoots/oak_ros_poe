@@ -33,6 +33,8 @@ public:
 private:
 
     bool m_running;
+    bool m_stereo_is_rectified;
+
     std::string m_device_id;
     std::string m_topic_name;
 
@@ -52,6 +54,8 @@ private:
     void run();
 
     void depthCallback(std::shared_ptr<dai::ADatatype> data);
+
+    sensor_msgs::CameraInfo getCameraInfo(std::shared_ptr<dai::ImgFrame> img, dai::CameraBoardSocket socket); // In Oak convention, right camera is the main camera
 
     // ROS related functionalities
     // ros::NodeHandle m_nh;
