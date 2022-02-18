@@ -9,6 +9,12 @@
 #include <depthai-shared/properties/ColorCameraProperties.hpp>
 #include <depthai-shared/properties/StereoDepthProperties.hpp>
 
+/**
+ * @brief Oak Device parameters to configure output
+ * 
+ * @note IMU sensor if present, is always streamed
+ */
+
 struct OakRosParams
 {
     std::string device_id;

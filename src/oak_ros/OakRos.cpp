@@ -97,6 +97,26 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
     //     xoutColor->setStreamName("rgb");
     // }
 
+    // alway try to see if IMU stream is there
+    {  
+        auto imu = m_pipeline.create<dai::node::IMU>();
+        auto xoutIMU = m_pipeline.create<dai::node::XLinkOut>();
+        xoutIMU->setStreamName("imu");
+
+        // enable ACCELEROMETER_RAW and GYROSCOPE_RAW at 500 hz rate
+        imu->enableIMUSensor({dai::IMUSensor::ACCELEROMETER_RAW, dai::IMUSensor::GYROSCOPE_RAW}, 500);
+        // above this threshold packets will be sent in batch of X, if the host is not blocked and USB bandwidth is available
+        imu->setBatchReportThreshold(1);
+        // maximum number of IMU packets in a batch, if it's reached device will block sending until host can receive it
+        // if lower or equal to batchReportThreshold then the sending is always blocking on device
+        // useful to reduce device's CPU load  and number of lost packets, if CPU load is high on device side due to multiple nodes
+        imu->setMaxBatchReports(10);
+
+        // Link plugins IMU -> XLINK
+        imu->out.link(xoutIMU->input);
+        
+    }
+
     
 
     if (m_device_id.empty())
@@ -114,8 +134,8 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
     
     if (params.enable_stereo)
     {
-        leftQueue = m_device->getOutputQueue("left", 8, false);
-        rightQueue = m_device->getOutputQueue("right", 8, false);
+        m_leftQueue = m_device->getOutputQueue("left", 8, false);
+        m_rightQueue = m_device->getOutputQueue("right", 8, false);
 
         spdlog::info("advertising stereo cameras in ros topics...");
         m_leftPub.reset(new auto(m_imageTransport->advertiseCamera(m_topic_name + "/left/image_rect_raw", 3)));
@@ -124,7 +144,11 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
 
     if (params.enable_depth)
     {
-        depthQueue = m_device->getOutputQueue("depth", 8, false);
+        m_depthQueue = m_device->getOutputQueue("depth", 8, false);
+    }
+
+    {
+        m_imuQueue = m_device->getOutputQueue("imu", 50, false);
     }
 
     m_run = std::thread(&OakRos::run, this);
@@ -136,10 +160,21 @@ void OakRos::run()
 
     spdlog::info("{} OakRos running now", m_device_id);
 
-    dai::DataOutputQueue::CallbackId depthCallbackId;
+    dai::DataOutputQueue::CallbackId depthCallbackId, imuCallbackId;
     
-    if (depthQueue.get())
-        depthCallbackId = depthQueue->addCallback(std::bind(&OakRos::depthCallback, this, std::placeholders::_1));
+    if (m_depthQueue.get())
+    {
+        spdlog::info("{} adds depth queue callback", m_device_id);
+        depthCallbackId = m_depthQueue->addCallback(std::bind(&OakRos::depthCallback, this, std::placeholders::_1));
+    }
+        
+
+    if (m_imuQueue.get())
+    {
+        spdlog::info("{} adds imu queue callback", m_device_id);
+        imuCallbackId = m_imuQueue->addCallback(std::bind(&OakRos::imuCallback, this, std::placeholders::_1));
+    }
+        
 
 
     cv::Mat leftCvFrame, rightCvFrame;
@@ -148,16 +183,16 @@ void OakRos::run()
     while (m_running)
     {
         // process stereo data
-        if (leftQueue.get() && rightQueue.get())
+        if (m_leftQueue.get() && m_rightQueue.get())
         {
             unsigned int seqLeft, seqRight;
 
             std::shared_ptr<dai::ImgFrame> left, right;
 
-            left = leftQueue->get<dai::ImgFrame>();
+            left = m_leftQueue->get<dai::ImgFrame>();
             seqLeft = left->getSequenceNum();
 
-            right = rightQueue->get<dai::ImgFrame>();
+            right = m_rightQueue->get<dai::ImgFrame>();
             seqRight = right->getSequenceNum();
             
             while (seqRight != seqLeft)
@@ -166,11 +201,11 @@ void OakRos::run()
 
                 if (seqRight < seqLeft)
                 {
-                    right = rightQueue->get<dai::ImgFrame>();
+                    right = m_rightQueue->get<dai::ImgFrame>();
                     seqRight = right->getSequenceNum();
                 }else
                 {
-                    left = leftQueue->get<dai::ImgFrame>();
+                    left = m_leftQueue->get<dai::ImgFrame>();
                     seqLeft = left->getSequenceNum();
                 }
             }
@@ -226,8 +261,11 @@ void OakRos::run()
 
     }
 
-    if (depthQueue.get())
-        depthQueue->removeCallback(depthCallbackId);
+    if (m_depthQueue.get())
+        m_depthQueue->removeCallback(depthCallbackId);
+
+    if (m_imuQueue.get())
+        m_imuQueue->removeCallback(imuCallbackId);
 
     spdlog::info("{} OakRos quitting", m_device_id);
 }
@@ -240,6 +278,29 @@ void OakRos::depthCallback(std::shared_ptr<dai::ADatatype> data)
     double ts = depthFrame->getTimestamp().time_since_epoch().count() / 1.0e9;
 
     spdlog::debug("{} depth seq = {}, ts = {}", m_device_id, seq, ts);
+}
+
+void OakRos::imuCallback(std::shared_ptr<dai::ADatatype> data)
+{
+    std::shared_ptr<dai::IMUData> imuData = std::static_pointer_cast<dai::IMUData>(data);
+
+    auto imuPackets = imuData->packets;
+    for(auto& imuPacket : imuPackets) {
+        auto& acceleroValues = imuPacket.acceleroMeter;
+        auto& gyroValues = imuPacket.gyroscope;
+
+        double acceleroTs = acceleroValues.timestamp.get().time_since_epoch().count() / 1.0e9;
+        double gyroTs = gyroValues.timestamp.get().time_since_epoch().count() / 1.0e9;
+
+        spdlog::debug("{} imu accel ts = {}", m_device_id, acceleroTs);
+        spdlog::debug("{} imu gyro ts = {}", m_device_id, gyroTs);
+
+        // printf("Accelerometer timestamp: %ld ms\n", static_cast<long>(acceleroTs.time_since_epoch().count()));
+        // printf("Accelerometer [m/s^2]: x: %.3f y: %.3f z: %.3f \n", acceleroValues.x, acceleroValues.y, acceleroValues.z);
+        // printf("Gyroscope timestamp: %ld ms\n", static_cast<long>(gyroTs.time_since_epoch().count()));
+        // printf("Gyroscope [rad/s]: x: %.3f y: %.3f z: %.3f \n", gyroValues.x, gyroValues.y, gyroValues.z);
+    }
+
 }
 
 sensor_msgs::CameraInfo OakRos::getCameraInfo(std::shared_ptr<dai::ImgFrame> img, dai::CameraBoardSocket socket)
