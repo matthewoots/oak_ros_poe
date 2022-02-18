@@ -12,6 +12,12 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
     m_topic_name = params.topic_name;
     m_stereo_is_rectified = false;
 
+    if (params.stereo_fps_throttle)
+    {
+        m_stereo_seq_throttle = *(params.stereo_fps_throttle);
+        spdlog::info("{} user code throttling fps to {}", m_device_id, m_stereo_seq_throttle);
+    }
+
     auto xoutLeft = m_pipeline.create<dai::node::XLinkOut>();
     auto xoutRight = m_pipeline.create<dai::node::XLinkOut>();
     xoutLeft->setStreamName("left");
@@ -39,15 +45,26 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
     if (params.enable_stereo || params.enable_depth)
     {
         
-        monoLeft->setResolution(params.stereo_resolution);
+        if (params.stereo_resolution)
+        {
+            monoLeft->setResolution(params.stereo_resolution.value());
+            monoRight->setResolution(params.stereo_resolution.value());
+        }
+        
         monoLeft->setBoardSocket(dai::CameraBoardSocket::LEFT);
-        monoRight->setResolution(params.stereo_resolution);
         monoRight->setBoardSocket(dai::CameraBoardSocket::RIGHT);
+
+        if (params.stereo_fps)
+        {
+            spdlog::info("{} sets stereo fps to {}", m_device_id, params.stereo_fps.value());
+            monoLeft->setFps(params.stereo_fps.value());
+            monoRight->setFps(params.stereo_fps.value());
+        }
 
         // direct link from sensor to output
         if (params.enable_stereo && !params.enable_depth)
         {
-            spdlog::info("enabling both only raw stereo...");
+            spdlog::info("{} enabling both only raw stereo...", m_device_id);
             monoLeft->out.link(xoutLeft->input);
             monoRight->out.link(xoutRight->input);
 
@@ -59,7 +76,7 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
 
             if (params.enable_stereo)
             {
-                spdlog::info("enabling both depth and stereo streams...");
+                spdlog::info("{} enabling both depth and stereo streams...", m_device_id);
                 stereoDepth->setDefaultProfilePreset(dai::node::StereoDepth::PresetMode::HIGH_DENSITY);
                 stereoDepth->setRectifyEdgeFillColor(0); // black, to better see the cutout
                 // stereoDepth->setInputResolution(1280, 720);
@@ -99,6 +116,7 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
     // }
 
     // alway try to see if IMU stream is there
+    if (params.enable_imu)
     {  
         auto imu = m_pipeline.create<dai::node::IMU>();
         auto xoutIMU = m_pipeline.create<dai::node::XLinkOut>();
@@ -130,7 +148,7 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
     }
     
 
-    spdlog::info("device created with speed {}", m_device->getUsbSpeed());
+    spdlog::info("{} device created with speed {}", m_device_id, m_device->getUsbSpeed());
 
     
     if (params.enable_stereo)
@@ -138,7 +156,7 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
         m_leftQueue = m_device->getOutputQueue("left", 8, false);
         m_rightQueue = m_device->getOutputQueue("right", 8, false);
 
-        spdlog::info("advertising stereo cameras in ros topics...");
+        spdlog::info("{} advertising stereo cameras in ros topics...", m_device_id);
         m_leftPub.reset(new auto(m_imageTransport->advertiseCamera(m_topic_name + "/left/image_rect_raw", 3)));
         m_rightPub.reset(new auto(m_imageTransport->advertiseCamera(m_topic_name + "/right/image_rect_raw", 3)));
     }
@@ -148,6 +166,7 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
         m_depthQueue = m_device->getOutputQueue("depth", 8, false);
     }
 
+    if (params.enable_imu)
     {
         m_imuQueue = m_device->getOutputQueue("imu", 50, false);
     }
@@ -229,6 +248,9 @@ void OakRos::run()
                 }
                 
             }
+
+            if (seqLeft % m_stereo_seq_throttle)
+                continue;
 
             double tsLeft = left->getTimestamp().time_since_epoch().count() / 1.0e9;
             double tsRight = right->getTimestamp().time_since_epoch().count() / 1.0e9;

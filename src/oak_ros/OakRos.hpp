@@ -36,6 +36,9 @@ private:
     bool m_running;
     bool m_stereo_is_rectified;
 
+    // 1 means no throttling, only publish every N frames
+    int m_stereo_seq_throttle = 1;
+
     std::string m_device_id;
     std::string m_topic_name;
 

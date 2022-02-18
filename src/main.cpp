@@ -4,7 +4,7 @@
 
 int main(int argc, char **argv)
 {
-    spdlog::set_level(spdlog::level::info);
+    spdlog::set_level(spdlog::level::debug);
 
     ros::init(argc, argv, "oak_ros");
     ros::NodeHandle nh;
@@ -26,6 +26,9 @@ int main(int argc, char **argv)
         params.topic_name = "oak" + std::to_string(topic_name_seq);
         params.enable_stereo = true;
         params.enable_depth = false;
+
+        params.stereo_fps_throttle = 6;
+
         handler->init(nh_local, params);
 
         topic_name_seq++;
