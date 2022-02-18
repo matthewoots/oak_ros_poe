@@ -11,6 +11,7 @@
 #include <ros/ros.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <image_transport/image_transport.h>
+#include <sensor_msgs/Imu.h>
 
 class OakRos : public OakRosInterface
 {
@@ -59,8 +60,9 @@ private:
     sensor_msgs::CameraInfo getCameraInfo(std::shared_ptr<dai::ImgFrame> img, dai::CameraBoardSocket socket); // In Oak convention, right camera is the main camera
 
     // ROS related functionalities
-    // ros::NodeHandle m_nh;
+    ros::NodeHandle m_nh;
     std::shared_ptr<image_transport::ImageTransport> m_imageTransport;
     std::shared_ptr<image_transport::CameraPublisher> m_leftPub, m_rightPub;
+    std::shared_ptr<ros::Publisher> m_imuPub;
 
 };

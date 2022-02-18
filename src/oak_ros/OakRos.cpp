@@ -34,6 +34,7 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
 
     // ROS-related
     m_imageTransport = std::make_shared<image_transport::ImageTransport>(nh);
+    m_nh = nh;
 
     if (params.enable_stereo || params.enable_depth)
     {
@@ -284,6 +285,14 @@ void OakRos::imuCallback(std::shared_ptr<dai::ADatatype> data)
 {
     std::shared_ptr<dai::IMUData> imuData = std::static_pointer_cast<dai::IMUData>(data);
 
+    // check if we are the first time getting IMU data
+
+    if (!m_imuPub.get())
+    {
+        m_imuPub.reset(new auto(m_nh.advertise<sensor_msgs::Imu>(m_topic_name + "/imu", 10)));
+        spdlog::info("{} received first IMU message!", m_device_id);
+    }
+
     auto imuPackets = imuData->packets;
     for(auto& imuPacket : imuPackets) {
         auto& acceleroValues = imuPacket.acceleroMeter;
@@ -294,6 +303,24 @@ void OakRos::imuCallback(std::shared_ptr<dai::ADatatype> data)
 
         spdlog::debug("{} imu accel ts = {}", m_device_id, acceleroTs);
         spdlog::debug("{} imu gyro ts = {}", m_device_id, gyroTs);
+
+        sensor_msgs::Imu imuMsg;
+        // TODO: here we assume to align with gyro timestamp
+        if (std::abs(acceleroTs - gyroTs) > 0.01)
+        {
+            spdlog::warn("{} large ts difference between gyro and accel reading detected = {}", m_device_id, std::abs(acceleroTs - gyroTs));
+        }
+        imuMsg.header.stamp = ros::Time().fromSec(gyroTs);
+
+        imuMsg.angular_velocity.x = gyroValues.x;
+        imuMsg.angular_velocity.y = gyroValues.y;
+        imuMsg.angular_velocity.z = gyroValues.z;
+
+        imuMsg.linear_acceleration.x = acceleroValues.x;
+        imuMsg.linear_acceleration.y = acceleroValues.y;
+        imuMsg.linear_acceleration.z = acceleroValues.z;
+
+        m_imuPub->publish(imuMsg);
 
         // printf("Accelerometer timestamp: %ld ms\n", static_cast<long>(acceleroTs.time_since_epoch().count()));
         // printf("Accelerometer [m/s^2]: x: %.3f y: %.3f z: %.3f \n", acceleroValues.x, acceleroValues.y, acceleroValues.z);
