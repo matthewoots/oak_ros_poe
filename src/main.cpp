@@ -4,6 +4,7 @@
 
 int main(int argc, char **argv)
 {
+    spdlog::set_level(spdlog::level::info);
 
     ros::init(argc, argv, "oak_ros");
     ros::NodeHandle nh;
