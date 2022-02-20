@@ -18,6 +18,9 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
         spdlog::info("{} user code throttling fps to {}", m_device_id, m_stereo_seq_throttle);
     }
 
+    auto xinControl = m_pipeline.create<dai::node::XLinkIn>();
+    xinControl->setStreamName("control");
+
     auto xoutLeft = m_pipeline.create<dai::node::XLinkOut>();
     auto xoutRight = m_pipeline.create<dai::node::XLinkOut>();
     xoutLeft->setStreamName("left");
@@ -41,6 +44,11 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
     // ROS-related
     m_imageTransport = std::make_shared<image_transport::ImageTransport>(nh);
     m_nh = nh;
+
+    // Linking
+
+    xinControl->out.link(monoLeft->inputControl);
+    xinControl->out.link(monoRight->inputControl);
 
     if (params.enable_stereo || params.enable_depth)
     {
@@ -150,6 +158,11 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
 
     spdlog::info("{} device created with speed {}", m_device_id, m_device->getUsbSpeed());
 
+    // Control Queues
+
+    // camera exposure and ISO (gain) control
+    m_controlQueue = m_device->getInputQueue(xinControl->getStreamName());
+
     
     if (params.enable_stereo)
     {
@@ -171,6 +184,24 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
         m_imuQueue = m_device->getOutputQueue("imu", 50, false);
     }
 
+    // set camera configs
+
+    dai::CameraControl ctrl;
+    if (params.manual_exposure && params.manual_iso)
+    {
+        const int exposure = params.manual_exposure.value();
+        const int iso = params.manual_iso.value();
+        ctrl.setManualExposure(exposure, iso);
+
+        spdlog::info("{} Enable manual exposure = {} and iso = {}", m_device_id, exposure, iso);
+    }else{
+        spdlog::info("{} Enable auto exposure", m_device_id);
+        ctrl.setAutoExposureEnable();
+    }
+    
+    m_controlQueue->send(ctrl);
+    
+
     m_run = std::thread(&OakRos::run, this);
 }
 
@@ -178,6 +209,7 @@ void OakRos::run()
 {
     m_running = true;
 
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     spdlog::info("{} OakRos running now", m_device_id);
 
     dai::DataOutputQueue::CallbackId depthCallbackId, imuCallbackId;
