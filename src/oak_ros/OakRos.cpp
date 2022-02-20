@@ -130,8 +130,8 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
         auto xoutIMU = m_pipeline.create<dai::node::XLinkOut>();
         xoutIMU->setStreamName("imu");
 
-        // enable ACCELEROMETER_RAW and GYROSCOPE_RAW at 500 hz rate
-        imu->enableIMUSensor({dai::IMUSensor::ACCELEROMETER_RAW, dai::IMUSensor::GYROSCOPE_RAW}, 500);
+        // enable ACCELEROMETER_RAW and GYROSCOPE_RAW
+        imu->enableIMUSensor({dai::IMUSensor::ACCELEROMETER_RAW, dai::IMUSensor::GYROSCOPE_RAW}, params.imu_frequency);
         // above this threshold packets will be sent in batch of X, if the host is not blocked and USB bandwidth is available
         imu->setBatchReportThreshold(1);
         // maximum number of IMU packets in a batch, if it's reached device will block sending until host can receive it
