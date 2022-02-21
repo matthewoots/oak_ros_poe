@@ -2,9 +2,11 @@
 
 #include <spdlog/spdlog.h>
 
+#include <boost/program_options.hpp>
+
 // Preset good for indoor calibration
 
-OakRosParams getIndoorLightingParams()
+inline OakRosParams getVIOParams()
 {
     OakRosParams params;
 
@@ -14,18 +16,15 @@ OakRosParams getIndoorLightingParams()
 
     params.enable_imu = true;
 
-    params.manual_exposure = 2500; // in usec
-    params.manual_iso = 800; // 100 to 1600
-
     return params;
 }
 
-OakRosParams getCameraCalibrationParams()
+OakRosParams getIndoorLightingParams()
 {
-    auto params = getIndoorLightingParams();
+    auto params = getVIOParams();
 
-    // set to around 4 Hz data aquisition rate
-    params.stereo_fps_throttle = 8;
+    params.manual_exposure = 2500; // in usec
+    params.manual_iso = 500; // 100 to 1600
 
     return params;
 }
@@ -33,19 +32,15 @@ OakRosParams getCameraCalibrationParams()
 // preset that good for indoor low light
 OakRosParams getLowLightParams()
 {
-    OakRosParams params;
-
-    // enable raw stereo output, without depth generation
-    params.enable_stereo = true;
-    params.enable_depth = false;
-
-    params.enable_imu = true;
+    auto params = getVIOParams();
 
     params.manual_exposure = 8000; // in usec
     params.manual_iso = 1600; // 100 to 1600
 
     return params;
 }
+
+namespace po = boost::program_options;
 
 int main(int argc, char **argv)
 {
@@ -54,6 +49,26 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "oak_ros");
     ros::NodeHandle nh;
     ros::NodeHandle nh_local("~");
+
+    po::options_description desc ("Oak ROS Wrapper for multiple camera setup, with calibration modes");
+
+    int option_frequency;
+    std::string option_exposure_mode;
+
+    desc.add_options ()
+        ("help,h", "print usage message")
+        ("frequency,f", po::value(&option_frequency)->default_value(-1, "full-rate"), "set frequency not to be at full rate")
+        ("exposure_mode,m", po::value(&option_exposure_mode)->default_value("auto", "auto exposure"), "Exposure mode: auto, indoor, low-light, calibration")
+        ;
+
+    po::variables_map vm;
+    po::store (po::command_line_parser (argc, argv).options (desc).run (), vm);
+    po::notify (vm);
+
+    if (vm.count("help")) {  
+        std::cout << desc << "\n";
+        return 0;
+    }
 
     auto device_ids = OakRosFactory::getAllAvailableDeviceIds();
 
@@ -66,7 +81,32 @@ int main(int argc, char **argv)
         
         OakRosInterface::Ptr handler = oak_handlers.emplace_back(OakRosFactory::getOakRosHandler());
 
-        auto params = getCameraCalibrationParams();
+        OakRosParams params;
+        
+        // decide what params to use based on command-line inputs
+        {
+            if(option_exposure_mode == "auto")
+                params = getVIOParams();
+            else if (option_exposure_mode == "low-light")
+                params = getLowLightParams();
+            else if (option_exposure_mode == "indoor")
+                params = getIndoorLightingParams();
+            else if (option_exposure_mode == "calibration")
+            {
+                params = getIndoorLightingParams();
+                // OV7251 does not implement fps yet
+                // params.stereo_fps = 4;
+                params.stereo_fps_throttle = 30 / 4 + 1;
+            }
+                
+
+            if(option_frequency > 0)
+            {
+                params.stereo_fps_throttle = 30 / option_frequency + 1;
+            }
+                
+        }
+        
         params.device_id = id;
         params.topic_name = "oak" + std::to_string(topic_name_seq);
 

@@ -17,6 +17,8 @@ endif()
 find_package(Threads REQUIRED)
 find_package(OpenCV 4 REQUIRED)
 
+find_package(Boost REQUIRED COMPONENTS program_options)
+
 find_package(catkin REQUIRED COMPONENTS roscpp sensor_msgs image_transport
                                         cv_bridge pcl_conversions pcl_ros)
 
