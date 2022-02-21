@@ -40,6 +40,32 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
     auto monoLeft = m_pipeline.create<dai::node::MonoCamera>();
     auto monoRight = m_pipeline.create<dai::node::MonoCamera>();
 
+    // WORKAROUND FOR OV7251, inability to reduce framerate
+    std::shared_ptr<dai::node::Script> scriptLeft;
+    std::shared_ptr<dai::node::Script> scriptRight;
+
+    if (params.rates_workaround)
+    {
+        spdlog::info("{} using rates workaround to cut framerate to half", m_device_id);
+        scriptLeft = m_pipeline.create<dai::node::Script>();
+        scriptRight = m_pipeline.create<dai::node::Script>();
+
+        // Half the rates of all left and right images
+        scriptLeft->setScript(R"(
+        i = 0
+        while True:
+            frame = node.io['frameLeft'].get()
+            if frame.getSequenceNum() % 2 == 1:
+                node.io['streamLeft'].send(frame)
+        )");
+
+        scriptRight->setScript(R"(
+        while True:
+            frame = node.io['frameRight'].get()
+            if frame.getSequenceNum() % 2 == 1:
+                node.io['streamRight'].send(frame)
+        )");
+    }
 
     // ROS-related
     m_imageTransport = std::make_shared<image_transport::ImageTransport>(nh);
@@ -73,8 +99,19 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
         if (params.enable_stereo && !params.enable_depth)
         {
             spdlog::info("{} enabling both only raw stereo...", m_device_id);
-            monoLeft->out.link(xoutLeft->input);
-            monoRight->out.link(xoutRight->input);
+
+            if (params.rates_workaround)
+            {
+                monoLeft->out.link(scriptLeft->inputs["frameLeft"]);
+                scriptLeft->outputs["streamLeft"].link(xoutLeft->input);
+
+                monoRight->out.link(scriptRight->inputs["frameRight"]);
+                scriptRight->outputs["streamRight"].link(xoutRight->input);
+            }else{
+                monoLeft->out.link(xoutLeft->input);
+                monoRight->out.link(xoutRight->input);
+            }
+            
 
         } // sensor to stereo unit before going to output
         else if (params.enable_depth)
@@ -94,8 +131,17 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
                 stereoDepth->setSubpixel(false);
 
                 // Linking
-                monoLeft->out.link(stereoDepth->left);
-                monoRight->out.link(stereoDepth->right);
+                if (params.rates_workaround)
+                {
+                    monoLeft->out.link(scriptLeft->inputs["frameLeft"]);
+                    scriptLeft->outputs["streamLeft"].link(stereoDepth->left);
+
+                    monoRight->out.link(scriptRight->inputs["frameRight"]);
+                    scriptRight->outputs["streamRight"].link(stereoDepth->right);
+                }else{
+                    monoLeft->out.link(stereoDepth->left);
+                    monoRight->out.link(stereoDepth->right);
+                }
 
                 if (!params.enable_stereo_rectified)
                 {

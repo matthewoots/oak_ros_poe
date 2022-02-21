@@ -33,6 +33,8 @@ struct OakRosParams
 
     bool enable_rgb = false;
     bool enable_imu = false;
+
+    bool rates_workaround = false;
     
     int imu_frequency = 200;
 

@@ -54,11 +54,13 @@ int main(int argc, char **argv)
 
     int option_frequency;
     std::string option_exposure_mode;
+    bool option_rates_workaround;
 
     desc.add_options ()
         ("help,h", "print usage message")
         ("frequency,f", po::value(&option_frequency)->default_value(-1, "full-rate"), "set frequency not to be at full rate")
         ("exposure_mode,m", po::value(&option_exposure_mode)->default_value("auto", "auto exposure"), "Exposure mode: auto, indoor, low-light, calibration")
+        ("rates-workaround", po::value(&option_rates_workaround)->default_value(false, "false"), "Enable to half the rates of OV7251 sensor, and use alternative rate control")
         ;
 
     po::variables_map vm;
@@ -94,21 +96,31 @@ int main(int argc, char **argv)
             else if (option_exposure_mode == "calibration")
             {
                 params = getIndoorLightingParams();
-                // OV7251 does not implement fps yet
-                // params.stereo_fps = 4;
-                params.stereo_fps_throttle = 30 / 4 + 1;
+
+                if (option_rates_workaround)
+                {
+                    // OV7251 does not implement fps yet
+                    params.stereo_fps_throttle = 15 / 4 + 1;
+                }else
+                    params.stereo_fps = 4;
+                
             }
                 
 
             if(option_frequency > 0)
             {
-                params.stereo_fps_throttle = 30 / option_frequency + 1;
+                if (option_rates_workaround)
+                    params.stereo_fps_throttle = 15 / option_frequency + 1;
+                else
+                    params.stereo_fps = option_frequency;
             }
                 
         }
         
         params.device_id = id;
         params.topic_name = "oak" + std::to_string(topic_name_seq);
+
+        params.rates_workaround = option_rates_workaround;
 
         handler->init(nh_local, params);
 
