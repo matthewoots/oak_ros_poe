@@ -21,8 +21,8 @@ OakRosParams getIndoorLightingParams()
 {
     auto params = getVIOParams();
 
-    params.manual_exposure = 2500; // in usec
-    params.manual_iso = 500; // 100 to 1600
+    params.manual_exposure = 1000; // in usec
+    params.manual_iso = 300; // 100 to 1600
 
     return params;
 }
@@ -104,6 +104,9 @@ int main(int argc, char **argv)
                 }else
                     params.stereo_fps = 4;
                 
+            }else{
+                spdlog::warn("invalid mode {}", option_exposure_mode);
+                return -1;
             }
                 
 
