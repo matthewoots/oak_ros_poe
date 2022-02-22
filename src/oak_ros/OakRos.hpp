@@ -38,6 +38,8 @@ private:
 
     // 1 means no throttling, only publish every N frames
     int m_stereo_seq_throttle = 1;
+    
+    bool m_ts_align_to_right;
 
     std::string m_device_id;
     std::string m_topic_name;

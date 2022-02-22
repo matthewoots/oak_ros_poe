@@ -11,6 +11,7 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
     m_device_id = params.device_id;
     m_topic_name = params.topic_name;
     m_stereo_is_rectified = false;
+    m_ts_align_to_right = params.align_ts_to_right;
 
     if (params.stereo_fps_throttle)
     {
@@ -340,7 +341,10 @@ void OakRos::run()
             {
                 leftCvFrame = left->getFrame();
 
-                leftCameraInfo.header.stamp = ros::Time().fromSec(tsLeft);
+                if (m_ts_align_to_right)
+                    leftCameraInfo.header.stamp = ros::Time().fromSec(tsRight);
+                else
+                    leftCameraInfo.header.stamp = ros::Time().fromSec(tsLeft);
                 cv_bridge::CvImage leftBridge = cv_bridge::CvImage(leftCameraInfo.header, sensor_msgs::image_encodings::MONO8, leftCvFrame);
 
                 m_leftPub->publish(*leftBridge.toImageMsg(), leftCameraInfo);

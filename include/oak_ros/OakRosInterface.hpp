@@ -34,7 +34,8 @@ struct OakRosParams
     bool enable_rgb = false;
     bool enable_imu = false;
 
-    bool rates_workaround = false;
+    bool rates_workaround = false; // make image rates half using Movidius script
+    bool align_ts_to_right = true; // when enabled, the timestamp of the stereo is align to right camera's
     
     int imu_frequency = 200;
 
