@@ -12,8 +12,6 @@ inline OakRosParams getVIOParams()
 
     // enable raw stereo output, without depth generation
     params.enable_stereo = true;
-    params.enable_depth = false;
-
     params.enable_imu = true;
 
     return params;
@@ -54,11 +52,13 @@ int main(int argc, char **argv)
 
     int option_frequency;
     std::string option_exposure_mode;
+    bool option_depth;
     bool option_rates_workaround;
 
     desc.add_options ()
         ("help,h", "print usage message")
         ("frequency,f", po::value(&option_frequency)->default_value(-1, "full-rate"), "set frequency not to be at full rate")
+        ("depth,d", po::value(&option_depth)->default_value(false, "false"), "publish depth")
         ("exposure_mode,m", po::value(&option_exposure_mode)->default_value("auto", "auto exposure"), "Exposure mode: auto, indoor, low-light, calibration")
         ("rates-workaround", po::value(&option_rates_workaround)->default_value(false, "false"), "Enable to half the rates of OV7251 sensor, and use alternative rate control")
         ;
@@ -116,6 +116,8 @@ int main(int argc, char **argv)
             }
                 
         }
+
+        params.enable_depth = option_depth;
         
         params.device_id = id;
         params.topic_name = "oak" + std::to_string(topic_name_seq);

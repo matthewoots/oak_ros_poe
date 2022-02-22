@@ -28,8 +28,6 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
     xoutRight->setStreamName("right");
 
     // auto xoutDisp = m_pipeline.create<dai::node::XLinkOut>();
-    auto xoutDepth = m_pipeline.create<dai::node::XLinkOut>();
-    xoutDepth->setStreamName("depth");
     // auto xoutRectifL = m_pipeline.create<dai::node::XLinkOut>();
     // auto xoutRectifR = m_pipeline.create<dai::node::XLinkOut>();
 
@@ -37,7 +35,7 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
     // auto colorMain = m_pipeline.create<dai::node::ColorCamera>();
 
     // configure the stereo sensors' format
-    auto stereoDepth = m_pipeline.create<dai::node::StereoDepth>();
+    std::shared_ptr<dai::node::StereoDepth> stereoDepth;
     auto monoLeft = m_pipeline.create<dai::node::MonoCamera>();
     auto monoRight = m_pipeline.create<dai::node::MonoCamera>();
 
@@ -117,7 +115,9 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
         } // sensor to stereo unit before going to output
         else if (params.enable_depth)
         {
-
+            stereoDepth = m_pipeline.create<dai::node::StereoDepth>();
+            auto xoutDepth = m_pipeline.create<dai::node::XLinkOut>();
+            xoutDepth->setStreamName("depth");
             stereoDepth->depth.link(xoutDepth->input);
 
             if (params.enable_stereo)
