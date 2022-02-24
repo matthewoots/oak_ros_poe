@@ -94,8 +94,8 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
             monoRight->setFps(params.stereo_fps.value());
         }
 
-        // direct link from sensor to output
-        if (params.enable_stereo && !params.enable_depth)
+        // case where no depth node is required
+        if (!params.enable_stereo_rectified && params.enable_stereo && !params.enable_depth)
         {
             spdlog::info("{} enabling both only raw stereo...", m_device_id);
 
@@ -112,56 +112,62 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
             }
             
 
-        } // sensor to stereo unit before going to output
-        else if (params.enable_depth)
+        }
+        // case where depth node is required
+        else if (params.enable_depth || params.enable_stereo_rectified)
         {
             stereoDepth = m_pipeline.create<dai::node::StereoDepth>();
-            auto xoutDepth = m_pipeline.create<dai::node::XLinkOut>();
-            xoutDepth->setStreamName("depth");
-            stereoDepth->depth.link(xoutDepth->input);
+            stereoDepth->setDefaultProfilePreset(dai::node::StereoDepth::PresetMode::HIGH_DENSITY);
+            stereoDepth->setRectifyEdgeFillColor(0); // black, to better see the cutout
+            // stereoDepth->setInputResolution(1280, 720);
+            stereoDepth->initialConfig.setMedianFilter(dai::MedianFilter::KERNEL_5x5);
+            stereoDepth->setLeftRightCheck(true);
+            stereoDepth->setExtendedDisparity(false);
+            stereoDepth->setSubpixel(false);
 
+            // Linking
+            if (params.rates_workaround)
+            {
+                monoLeft->out.link(scriptLeft->inputs["frameLeft"]);
+                scriptLeft->outputs["streamLeft"].link(stereoDepth->left);
+
+                monoRight->out.link(scriptRight->inputs["frameRight"]);
+                scriptRight->outputs["streamRight"].link(stereoDepth->right);
+            }else{
+                monoLeft->out.link(stereoDepth->left);
+                monoRight->out.link(stereoDepth->right);
+            }
+
+            // depth output stream
+            if (params.enable_depth)
+            {
+                spdlog::info("{} enabling depth streams...", m_device_id);
+                auto xoutDepth = m_pipeline.create<dai::node::XLinkOut>();
+                xoutDepth->setStreamName("depth");
+                stereoDepth->depth.link(xoutDepth->input);
+            }
+                
+            // stereo rectified will need depth node
             if (params.enable_stereo)
             {
-                spdlog::info("{} enabling both depth and stereo streams...", m_device_id);
-                stereoDepth->setDefaultProfilePreset(dai::node::StereoDepth::PresetMode::HIGH_DENSITY);
-                stereoDepth->setRectifyEdgeFillColor(0); // black, to better see the cutout
-                // stereoDepth->setInputResolution(1280, 720);
-                stereoDepth->initialConfig.setMedianFilter(dai::MedianFilter::KERNEL_5x5);
-                stereoDepth->setLeftRightCheck(true);
-                stereoDepth->setExtendedDisparity(false);
-                stereoDepth->setSubpixel(false);
-
-                // Linking
-                if (params.rates_workaround)
-                {
-                    monoLeft->out.link(scriptLeft->inputs["frameLeft"]);
-                    scriptLeft->outputs["streamLeft"].link(stereoDepth->left);
-
-                    monoRight->out.link(scriptRight->inputs["frameRight"]);
-                    scriptRight->outputs["streamRight"].link(stereoDepth->right);
-                }else{
-                    monoLeft->out.link(stereoDepth->left);
-                    monoRight->out.link(stereoDepth->right);
-                }
 
                 if (!params.enable_stereo_rectified)
                 {
+                    spdlog::info("{} enabling raw stereo streams...", m_device_id);
                     // output raw images
                     stereoDepth->syncedLeft.link(xoutLeft->input);
                     stereoDepth->syncedRight.link(xoutRight->input);
                 }
                 else
                 {
+                    spdlog::info("{} enabling rectified stereo streams...", m_device_id);
                     // output rectified images
                     stereoDepth->rectifiedLeft.link(xoutLeft->input);
                     stereoDepth->rectifiedRight.link(xoutRight->input);
                     m_stereo_is_rectified = true;
                 }
             }
-            else
-            {
-                throw std::runtime_error("not implemented for enabled depth, but disabled stereo");
-            }
+            
         }
     }
 
