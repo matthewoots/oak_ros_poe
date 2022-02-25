@@ -88,6 +88,7 @@ int main(int argc, char **argv)
         OakRosParams params;
         
         // decide what params to use based on command-line inputs
+        constexpr unsigned int FULL_FPS = 30;
         {
             if(option_exposure_mode == "auto")
                 params = getVIOParams();
@@ -99,12 +100,7 @@ int main(int argc, char **argv)
             {
                 params = getIndoorLightingParams();
 
-                if (option_rates_workaround)
-                {
-                    // OV7251 does not implement fps yet
-                    params.stereo_fps_throttle = 15 / 4 + 1;
-                }else
-                    params.stereo_fps = 4;
+                option_frequency = 4;
                 
             }else{
                 spdlog::warn("invalid mode {}", option_exposure_mode);
@@ -115,7 +111,7 @@ int main(int argc, char **argv)
             if(option_frequency > 0)
             {
                 if (option_rates_workaround)
-                    params.stereo_fps_throttle = 15 / option_frequency + 1;
+                    params.stereo_fps_throttle = FULL_FPS / option_frequency + 1;
                 else
                     params.stereo_fps = option_frequency;
             }

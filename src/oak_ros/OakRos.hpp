@@ -37,7 +37,8 @@ private:
     bool m_stereo_is_rectified;
 
     // 1 means no throttling, only publish every N frames
-    int m_stereo_seq_throttle = 1;
+    unsigned int m_stereo_seq_throttle = 1;
+    unsigned int lastSeq = 0;
     
     bool m_ts_align_to_right;
 

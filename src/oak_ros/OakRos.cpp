@@ -16,7 +16,7 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
     if (params.stereo_fps_throttle)
     {
         m_stereo_seq_throttle = *(params.stereo_fps_throttle);
-        spdlog::info("{} user code throttling fps to {}", m_device_id, m_stereo_seq_throttle);
+        spdlog::info("{} user code throttling images to publish every {} frames", m_device_id, m_stereo_seq_throttle);
     }
 
     auto xinControl = m_pipeline.create<dai::node::XLinkIn>();
@@ -337,8 +337,10 @@ void OakRos::run()
                 
             }
 
-            if (seqLeft % m_stereo_seq_throttle)
+            if (lastSeq != 0 && (seqLeft - lastSeq < m_stereo_seq_throttle))
                 continue;
+
+            lastSeq = seqLeft;
 
             double tsLeft = left->getTimestamp().time_since_epoch().count() / 1.0e9;
             double tsRight = right->getTimestamp().time_since_epoch().count() / 1.0e9;
