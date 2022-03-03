@@ -404,7 +404,7 @@ void OakRos::imuCallback(std::shared_ptr<dai::ADatatype> data)
 
     if (!m_imuPub.get())
     {
-        m_imuPub.reset(new auto(m_nh.advertise<sensor_msgs::Imu>(m_topic_name + "/imu", 10)));
+        m_imuPub.reset(new auto(m_nh.advertise<sensor_msgs::Imu>(m_topic_name + "/imu", 100)));
         spdlog::info("{} received first IMU message!", m_device_id);
     }
 
@@ -425,6 +425,25 @@ void OakRos::imuCallback(std::shared_ptr<dai::ADatatype> data)
         {
             spdlog::warn("{} large ts difference between gyro and accel reading detected = {}", m_device_id, std::abs(acceleroTs - gyroTs));
         }
+
+        if (lastGyroTs > 0)
+        {
+            // check if the timestamp is regressing
+
+            if (gyroTs <= lastGyroTs)
+            {
+                spdlog::warn("{} gyro ts regressing detected {} -> {}", m_device_id, lastGyroTs, gyroTs);
+            }
+
+            if (gyroTs > lastGyroTs + 0.1)
+            {
+                spdlog::warn("{} gyro ts jump detected {} -> {}", m_device_id, lastGyroTs, gyroTs);
+            }
+
+        }
+        lastGyroTs = gyroTs;
+
+
         imuMsg.header.stamp = ros::Time().fromSec(gyroTs);
 
         imuMsg.angular_velocity.x = gyroValues.x;

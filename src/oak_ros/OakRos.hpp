@@ -39,6 +39,7 @@ private:
     // 1 means no throttling, only publish every N frames
     unsigned int m_stereo_seq_throttle = 1;
     unsigned int lastSeq = 0;
+    double lastGyroTs = -1;
     
     bool m_ts_align_to_right;
 
