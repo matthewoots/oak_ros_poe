@@ -8,6 +8,11 @@
 set(depthai_DIR "/home/$ENV{USER}/git/depthai-core/build/install/lib/cmake/depthai")
 ```
 
+Other ROS packages needed
+```
+sudo apt install ros-noetic-pcl-conversions ros-noetic-pcl-ros
+```
+
 ## Runing the Node
 Automatic dicovery of all connected OAK devices and expose the stereo streams as ROS topics in the format `/oak{#no}/[left/right]`
 ```bash
