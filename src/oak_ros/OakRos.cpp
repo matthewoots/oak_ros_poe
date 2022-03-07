@@ -36,8 +36,8 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
 
     // configure the stereo sensors' format
     std::shared_ptr<dai::node::StereoDepth> stereoDepth;
-    auto monoLeft = m_pipeline.create<dai::node::MonoCamera>();
-    auto monoRight = m_pipeline.create<dai::node::MonoCamera>();
+    m_monoLeft = m_pipeline.create<dai::node::MonoCamera>();
+    m_monoRight = m_pipeline.create<dai::node::MonoCamera>();
 
     // WORKAROUND FOR OV7251, inability to reduce framerate
     std::shared_ptr<dai::node::Script> scriptLeft;
@@ -72,26 +72,26 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
 
     // Linking
 
-    xinControl->out.link(monoLeft->inputControl);
-    xinControl->out.link(monoRight->inputControl);
+    xinControl->out.link(m_monoLeft->inputControl);
+    xinControl->out.link(m_monoRight->inputControl);
 
     if (params.enable_stereo || params.enable_depth)
     {
         
         if (params.stereo_resolution)
         {
-            monoLeft->setResolution(params.stereo_resolution.value());
-            monoRight->setResolution(params.stereo_resolution.value());
+            m_monoLeft->setResolution(params.stereo_resolution.value());
+            m_monoRight->setResolution(params.stereo_resolution.value());
         }
         
-        monoLeft->setBoardSocket(dai::CameraBoardSocket::LEFT);
-        monoRight->setBoardSocket(dai::CameraBoardSocket::RIGHT);
+        m_monoLeft->setBoardSocket(dai::CameraBoardSocket::LEFT);
+        m_monoRight->setBoardSocket(dai::CameraBoardSocket::RIGHT);
 
         if (params.stereo_fps)
         {
             spdlog::info("{} sets stereo fps to {}", m_device_id, params.stereo_fps.value());
-            monoLeft->setFps(params.stereo_fps.value());
-            monoRight->setFps(params.stereo_fps.value());
+            m_monoLeft->setFps(params.stereo_fps.value());
+            m_monoRight->setFps(params.stereo_fps.value());
         }
 
         // case where no depth node is required
@@ -101,14 +101,14 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
 
             if (params.rates_workaround)
             {
-                monoLeft->out.link(scriptLeft->inputs["frameLeft"]);
+                m_monoLeft->out.link(scriptLeft->inputs["frameLeft"]);
                 scriptLeft->outputs["streamLeft"].link(xoutLeft->input);
 
-                monoRight->out.link(scriptRight->inputs["frameRight"]);
+                m_monoRight->out.link(scriptRight->inputs["frameRight"]);
                 scriptRight->outputs["streamRight"].link(xoutRight->input);
             }else{
-                monoLeft->out.link(xoutLeft->input);
-                monoRight->out.link(xoutRight->input);
+                m_monoLeft->out.link(xoutLeft->input);
+                m_monoRight->out.link(xoutRight->input);
             }
             
 
@@ -128,14 +128,14 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
             // Linking
             if (params.rates_workaround)
             {
-                monoLeft->out.link(scriptLeft->inputs["frameLeft"]);
+                m_monoLeft->out.link(scriptLeft->inputs["frameLeft"]);
                 scriptLeft->outputs["streamLeft"].link(stereoDepth->left);
 
-                monoRight->out.link(scriptRight->inputs["frameRight"]);
+                m_monoRight->out.link(scriptRight->inputs["frameRight"]);
                 scriptRight->outputs["streamRight"].link(stereoDepth->right);
             }else{
-                monoLeft->out.link(stereoDepth->left);
-                monoRight->out.link(stereoDepth->right);
+                m_monoLeft->out.link(stereoDepth->left);
+                m_monoRight->out.link(stereoDepth->right);
             }
 
             // depth output stream
