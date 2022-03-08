@@ -53,6 +53,7 @@ int main(int argc, char **argv)
     int option_frequency;
     std::string option_exposure_mode;
     bool option_depth;
+    bool option_apriltag_detection;
     bool option_rectified;
     bool option_rates_workaround;
 
@@ -60,9 +61,10 @@ int main(int argc, char **argv)
         ("help,h", "print usage message")
         ("frequency,f", po::value(&option_frequency)->default_value(-1, "full-rate"), "set frequency not to be at full rate")
         ("depth,d", po::value(&option_depth)->default_value(false, "false"), "publish depth")
+        ("apriltag_detection,a", po::value(&option_apriltag_detection)->default_value(false, "false"), "publish apriltag detection")
         ("rectifed,r", po::value(&option_rectified)->default_value(true, "true"), "rectify / undistort stereo image")
         ("exposure_mode,m", po::value(&option_exposure_mode)->default_value("auto", "auto exposure"), "Exposure mode: auto, indoor, low-light, calibration")
-        ("rates-workaround", po::value(&option_rates_workaround)->default_value(true, "true"), "Enable to half the rates of OV7251 sensor, and use alternative rate control")
+        ("rates_workaround", po::value(&option_rates_workaround)->default_value(true, "true"), "Enable to half the rates of OV7251 sensor, and use alternative rate control")
         ;
 
     po::variables_map vm;
@@ -125,6 +127,8 @@ int main(int argc, char **argv)
 
         params.rates_workaround = option_rates_workaround;
         params.enable_stereo_rectified = option_rectified;
+
+        params.enable_apriltag = option_apriltag_detection;
 
         handler->init(nh_local, params);
 

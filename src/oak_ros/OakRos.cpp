@@ -200,6 +200,47 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
         
     }
 
+
+    if (params.enable_apriltag)
+    {
+        auto aprilTag = m_pipeline.create<dai::node::AprilTag>();
+        auto xoutAprilTag = m_pipeline.create<dai::node::XLinkOut>();
+
+        auto xoutAprilPassthrough = m_pipeline.create<dai::node::XLinkOut>();
+        // do not send the buffer frame (image data)
+        xoutAprilPassthrough->setMetadataOnly(true);
+        xoutAprilPassthrough->setStreamName("aprilTagPass");
+
+        xoutAprilTag->setStreamName("aprilTagData");
+
+        // both the image and the detection results are output to xlink
+        aprilTag->passthroughInputImage.link(xoutAprilPassthrough->input);
+        aprilTag->out.link(xoutAprilTag->input);
+
+        // auto manip = m_pipeline.create<dai::node::ImageManip>();
+        
+        // use left camera to detect
+        if (params.rates_workaround)
+        {
+            scriptLeft->outputs["streamLeft"].link(aprilTag->inputImage);
+        }else
+        {
+            m_monoLeft->out.link(aprilTag->inputImage);
+        }
+
+        // manip->initialConfig.setResize(480, 270);
+        // manip->initialConfig.setFrameType(dai::ImgFrame::Type::GRAY8);
+        // manip->out.link(aprilTag->inputImage);
+
+        auto aprilConfig = aprilTag->initialConfig.get();
+        aprilConfig.quadSigma = 0.8f;
+        aprilTag->initialConfig.set(aprilConfig);
+
+        // always take the latest frame as apriltag detections are slow
+        aprilTag->inputImage.setBlocking(false);
+        aprilTag->inputImage.setQueueSize(1);
+    }
+
     
 
     if (m_device_id.empty())
@@ -240,6 +281,12 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
         m_imuQueue = m_device->getOutputQueue("imu", 50, false);
     }
 
+    if (params.enable_apriltag)
+    {
+        m_aprilTagQueue = m_device->getOutputQueue("aprilTagData", 5, false);
+        m_aprilTagPassthroughQueue = m_device->getOutputQueue("aprilTagPass", 5, false);
+    }
+
     // set camera configs
 
     dai::CameraControl ctrl;
@@ -268,7 +315,7 @@ void OakRos::run()
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     spdlog::info("{} OakRos running now", m_device_id);
 
-    dai::DataOutputQueue::CallbackId depthCallbackId, imuCallbackId;
+    dai::DataOutputQueue::CallbackId depthCallbackId, imuCallbackId, aprilTagCallbackId;
     
     if (m_depthQueue.get())
     {
@@ -283,7 +330,11 @@ void OakRos::run()
         imuCallbackId = m_imuQueue->addCallback(std::bind(&OakRos::imuCallback, this, std::placeholders::_1));
     }
         
-
+    if (m_aprilTagQueue.get())
+    {
+        spdlog::info("{} adds April Tag queue callback", m_device_id);
+        aprilTagCallbackId = m_aprilTagQueue->addCallback(std::bind(&OakRos::aprilTagCallback, this, std::placeholders::_1));
+    }
 
     cv::Mat leftCvFrame, rightCvFrame;
     sensor_msgs::CameraInfo leftCameraInfo, rightCameraInfo;
@@ -383,6 +434,9 @@ void OakRos::run()
     if (m_imuQueue.get())
         m_imuQueue->removeCallback(imuCallbackId);
 
+    if (m_aprilTagQueue.get())
+        m_aprilTagQueue->removeCallback(aprilTagCallbackId);
+
     spdlog::info("{} OakRos quitting", m_device_id);
 }
 
@@ -462,6 +516,14 @@ void OakRos::imuCallback(std::shared_ptr<dai::ADatatype> data)
         // printf("Gyroscope [rad/s]: x: %.3f y: %.3f z: %.3f \n", gyroValues.x, gyroValues.y, gyroValues.z);
     }
 
+}
+
+void OakRos::aprilTagCallback(std::shared_ptr<dai::ADatatype> data)
+{
+    std::shared_ptr<dai::AprilTags> aprilTags = std::static_pointer_cast<dai::AprilTags>(data);
+
+    auto size = aprilTags->aprilTags.size();
+    spdlog::info("{} april tag size = {}", m_device_id, size);
 }
 
 sensor_msgs::CameraInfo OakRos::getCameraInfo(std::shared_ptr<dai::ImgFrame> img, dai::CameraBoardSocket socket)
