@@ -484,7 +484,34 @@ sensor_msgs::CameraInfo OakRos::getCameraInfo(std::shared_ptr<dai::ImgFrame> img
 
     std::copy(flatIntrinsics.begin(), flatIntrinsics.end(), info.K.begin());
 
-    // TODO: fill in P
+    // fill in P
+    info.P.at(0) = intrinsics[0][0];
+    info.P.at(1) = intrinsics[0][1];
+    info.P.at(2) = intrinsics[0][2];
+
+    // camerainfo.P.at(3) = 0; // Tx, -fx * B
+    // This is the translation term Tx for right camera, assuming left cam is the origin
+    info.P.at(3) = 0;
+
+    info.P.at(4) = intrinsics[1][0];
+    info.P.at(5) = intrinsics[1][1];
+    info.P.at(6) = intrinsics[2][2];
+    info.P.at(7) = 0; // Ty
+    info.P.at(8) = intrinsics[2][0];
+    info.P.at(9) = intrinsics[2][1];
+    info.P.at(10) = intrinsics[2][2];
+    info.P.at(11) = 0;
+
+    // set R (rotation matrix) values to identity matrix
+    info.R.at(0) = 1.0;
+    info.R.at(1) = 0.0;
+    info.R.at(2) = 0.0;
+    info.R.at(3) = 0.0;
+    info.R.at(4) = 1.0;
+    info.R.at(5) = 0.0;
+    info.R.at(6) = 0.0;
+    info.R.at(7) = 0.0;
+    info.R.at(8) = 1.0;
 
     info.width = static_cast<uint32_t>(img->getWidth());
     info.height = static_cast<uint32_t>(img->getHeight());
