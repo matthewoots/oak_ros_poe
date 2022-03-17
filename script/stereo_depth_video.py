@@ -17,7 +17,7 @@ parser.add_argument(
     "-md",
     "--mesh_dir",
     type=str,
-    default=None,
+    default="../data/",
     help="Output directory for mesh files. If not specified mesh files won't be saved",
 )
 parser.add_argument(
