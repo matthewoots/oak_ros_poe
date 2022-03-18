@@ -264,21 +264,21 @@ if generateMesh:
 if meshDirectory is not None:
     saveMeshFiles(leftMesh, rightMesh, meshDirectory)
 
+print("Done")
+# print("Creating DepthAI device")
+# with dai.Device(pipeline) as device:
+#     # Create a receive queue for each stream
+#     qList = [device.getOutputQueue(stream, 8, blocking=False) for stream in streams]
 
-print("Creating DepthAI device")
-with dai.Device(pipeline) as device:
-    # Create a receive queue for each stream
-    qList = [device.getOutputQueue(stream, 8, blocking=False) for stream in streams]
+#     while True:
+#         for q in qList:
+#             name = q.getName()
+#             frame = q.get().getCvFrame()
+#             if name == "depth":
+#                 frame = frame.astype(np.uint16)
+#             elif name == "disparity":
+#                 frame = getDisparityFrame(frame)
 
-    while True:
-        for q in qList:
-            name = q.getName()
-            frame = q.get().getCvFrame()
-            if name == "depth":
-                frame = frame.astype(np.uint16)
-            elif name == "disparity":
-                frame = getDisparityFrame(frame)
-
-            cv2.imshow(name, frame)
-        if cv2.waitKey(1) == ord("q"):
-            break
+#             cv2.imshow(name, frame)
+#         if cv2.waitKey(1) == ord("q"):
+#             break

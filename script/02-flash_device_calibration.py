@@ -13,7 +13,7 @@ import yaml
 # Perspective = 0, Fisheye = 1, Equirectangular = 2, RadialDivision = 3 
 
 calibJsonFile = str((Path(__file__).parent / Path('./depthai_calib.json')).resolve().absolute())
-kalibrYamlFile = str((Path(__file__).parent / Path('./camchain.yaml')).resolve().absolute())
+kalibrYamlFile = str((Path(__file__).parent / Path('./camchain-nominal.yaml')).resolve().absolute())
 
 parser = argparse.ArgumentParser()
 parser.add_argument('calibJsonFile', nargs='?', help="Path to V6 calibration file in json", default=calibJsonFile)
