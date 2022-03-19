@@ -127,7 +127,7 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
 
             // Load Mesh Data
             if (params.enable_mesh_dir.empty())
-                spdlog::info("No mesh file directory specified, skip mesh overriding");
+                spdlog::warn("No mesh file directory specified, skip mesh overriding");
             else{
                 auto leftPath = params.enable_mesh_dir + "/left_mesh.calib";
                 auto rightPath = params.enable_mesh_dir + "/right_mesh.calib";
