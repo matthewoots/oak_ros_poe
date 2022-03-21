@@ -54,14 +54,14 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
         i = 0
         while True:
             frame = node.io['frameLeft'].get()
-            if frame.getSequenceNum() % 2 == 1:
+            if frame.getSequenceNum() % 3 == 1:
                 node.io['streamLeft'].send(frame)
         )");
 
         scriptRight->setScript(R"(
         while True:
             frame = node.io['frameRight'].get()
-            if frame.getSequenceNum() % 2 == 1:
+            if frame.getSequenceNum() % 3 == 1:
                 node.io['streamRight'].send(frame)
         )");
     }

@@ -59,7 +59,7 @@ struct OakRosParams
     std::optional<dai::ColorCameraProperties::SensorResolution> rgb_resolution = {}; // dai::ColorCameraProperties::SensorResolution::THE_1080_P;
 
     bool enable_imu = false;
-    int imu_frequency = 200;
+    int imu_frequency = 100;
 
     bool rates_workaround = false;
     bool align_ts_to_right = true;
