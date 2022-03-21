@@ -233,8 +233,8 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
     
     if (params.enable_stereo)
     {
-        m_leftQueue = m_device->getOutputQueue("left", 8, false);
-        m_rightQueue = m_device->getOutputQueue("right", 8, false);
+        m_leftQueue = m_device->getOutputQueue("left", 1, false);
+        m_rightQueue = m_device->getOutputQueue("right", 1, false);
 
         spdlog::info("{} advertising stereo cameras in ros topics...", m_device_id);
         m_leftPub.reset(new auto(m_imageTransport->advertiseCamera(m_topic_name + "/left/image_rect_raw", 3)));
@@ -243,7 +243,7 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
 
     if (params.enable_depth)
     {
-        m_depthQueue = m_device->getOutputQueue("depth", 8, false);
+        m_depthQueue = m_device->getOutputQueue("depth", 1, false);
     }
 
     if (params.enable_imu)
