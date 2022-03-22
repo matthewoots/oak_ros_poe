@@ -121,7 +121,7 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
             stereoDepth->setRectifyEdgeFillColor(0); // black, to better see the cutout
             // stereoDepth->setInputResolution(1280, 720);
             stereoDepth->initialConfig.setMedianFilter(dai::MedianFilter::KERNEL_5x5);
-            stereoDepth->setLeftRightCheck(true);
+            stereoDepth->setLeftRightCheck(false);
             stereoDepth->setExtendedDisparity(false);
             stereoDepth->setSubpixel(false);
 
@@ -200,11 +200,11 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
         imu->enableIMUSensor({dai::IMUSensor::ACCELEROMETER, dai::IMUSensor::GYROSCOPE_CALIBRATED}, params.imu_frequency);
         
         // above this threshold packets will be sent in batch of X, if the host is not blocked and USB bandwidth is available
-        imu->setBatchReportThreshold(1);
+        imu->setBatchReportThreshold(5);
         // maximum number of IMU packets in a batch, if it's reached device will block sending until host can receive it
         // if lower or equal to batchReportThreshold then the sending is always blocking on device
         // useful to reduce device's CPU load  and number of lost packets, if CPU load is high on device side due to multiple nodes
-        imu->setMaxBatchReports(10);
+        imu->setMaxBatchReports(20);
 
         // Link plugins IMU -> XLINK
         imu->out.link(xoutIMU->input);
@@ -222,8 +222,13 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
         m_device = std::make_shared<dai::Device>(m_pipeline, getDeviceInfo(m_device_id));
     }
     
+    dai::UsbSpeed usbSpeed = m_device->getUsbSpeed();
 
-    spdlog::info("{} device created with speed {}", m_device_id, m_device->getUsbSpeed());
+    if (usbSpeed < dai::UsbSpeed::SUPER){
+        spdlog::warn("{} device created with speed {}, not USB3, quitting", m_device_id, usbSpeed);
+        throw std::runtime_error("USB SPEED NOT USB3");
+    }else
+        spdlog::info("{} device created with speed {}", m_device_id, usbSpeed);
 
     // Control Queues
 
@@ -233,8 +238,8 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
     
     if (params.enable_stereo)
     {
-        m_leftQueue = m_device->getOutputQueue("left", 1, false);
-        m_rightQueue = m_device->getOutputQueue("right", 1, false);
+        m_leftQueue = m_device->getOutputQueue("left", 2, false);
+        m_rightQueue = m_device->getOutputQueue("right", 2, false);
 
         spdlog::info("{} advertising stereo cameras in ros topics...", m_device_id);
         m_leftPub.reset(new auto(m_imageTransport->advertiseCamera(m_topic_name + "/left/image_rect_raw", 3)));
@@ -243,7 +248,7 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
 
     if (params.enable_depth)
     {
-        m_depthQueue = m_device->getOutputQueue("depth", 1, false);
+        m_depthQueue = m_device->getOutputQueue("depth", 2, false);
     }
 
     if (params.enable_imu)
@@ -348,10 +353,14 @@ void OakRos::run()
                 
             }
 
-            if (lastSeq != 0 && (seqLeft - lastSeq < m_stereo_seq_throttle))
+            if (lastSeq && seqLeft - 3 != lastSeq)
+                spdlog::warn("jump detected in image frames, from {} to {}, should be to {}", lastSeq, seqLeft, lastSeq + 3);
+            lastSeq = seqLeft;
+
+            if (lastPublishedSeq != 0 && (seqLeft - lastPublishedSeq < m_stereo_seq_throttle))
                 continue;
 
-            lastSeq = seqLeft;
+            lastPublishedSeq = seqLeft;
 
             double tsLeft = left->getTimestamp().time_since_epoch().count() / 1.0e9;
             double tsRight = right->getTimestamp().time_since_epoch().count() / 1.0e9;
@@ -381,7 +390,7 @@ void OakRos::run()
 
                 m_rightPub->publish(*rightBridge.toImageMsg(), rightCameraInfo);
             }
-            
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
 
         }else
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
