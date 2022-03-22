@@ -313,25 +313,35 @@ void OakRos::run()
 
             std::shared_ptr<dai::ImgFrame> left, right;
 
-            left = m_leftQueue->get<dai::ImgFrame>();
-            seqLeft = left->getSequenceNum();
+            try{
+                left = m_leftQueue->get<dai::ImgFrame>();
+                seqLeft = left->getSequenceNum();
 
-            right = m_rightQueue->get<dai::ImgFrame>();
-            seqRight = right->getSequenceNum();
+                right = m_rightQueue->get<dai::ImgFrame>();
+                seqRight = right->getSequenceNum();
+            }catch(std::exception& e){
+                spdlog::warn("get() for left or right image failed: {}", e.what());
+                continue;
+            }
             
-            while (seqRight != seqLeft)
-            {
-                spdlog::warn("sequence number mismatch, skip frame. seqLeft = {}, seqRight = {}", seqLeft, seqRight);
+            try{
+                while (seqRight != seqLeft)
+                {
+                    spdlog::warn("sequence number mismatch, skip frame. seqLeft = {}, seqRight = {}", seqLeft, seqRight);
 
-                if (seqRight < seqLeft)
-                {
-                    right = m_rightQueue->get<dai::ImgFrame>();
-                    seqRight = right->getSequenceNum();
-                }else
-                {
-                    left = m_leftQueue->get<dai::ImgFrame>();
-                    seqLeft = left->getSequenceNum();
+                    if (seqRight < seqLeft)
+                    {
+                        right = m_rightQueue->get<dai::ImgFrame>();
+                        seqRight = right->getSequenceNum();
+                    }else
+                    {
+                        left = m_leftQueue->get<dai::ImgFrame>();
+                        seqLeft = left->getSequenceNum();
+                    }
                 }
+            }catch(std::exception& e){
+                spdlog::warn("get() for aligning left or right image seq failed: {}", e.what());
+                continue;
             }
 
             // Here we have make sure the stereo have the same sequence number. According to OAK, this ensures synchronisation
@@ -441,9 +451,11 @@ void OakRos::imuCallback(std::shared_ptr<dai::ADatatype> data)
 
         sensor_msgs::Imu imuMsg;
         // TODO: here we assume to align with gyro timestamp
-        if (std::abs(acceleroTs - gyroTs) > 0.01)
+        bool errorDetect = false;
+        if (std::abs(acceleroTs - gyroTs) > 0.015)
         {
             spdlog::warn("{} large ts difference between gyro and accel reading detected = {}", m_device_id, std::abs(acceleroTs - gyroTs));
+            errorDetect = true;
         }
 
         if (lastGyroTs > 0)
@@ -453,28 +465,33 @@ void OakRos::imuCallback(std::shared_ptr<dai::ADatatype> data)
             if (gyroTs <= lastGyroTs)
             {
                 spdlog::warn("{} gyro ts regressing detected {} -> {}", m_device_id, lastGyroTs, gyroTs);
+                errorDetect = true;
             }
 
             if (gyroTs > lastGyroTs + 0.1)
             {
                 spdlog::warn("{} gyro ts jump detected {} -> {}", m_device_id, lastGyroTs, gyroTs);
+                errorDetect = true;
             }
 
         }
         lastGyroTs = gyroTs;
 
+        if (!errorDetect){
+            imuMsg.header.stamp = ros::Time().fromSec(gyroTs);
 
-        imuMsg.header.stamp = ros::Time().fromSec(gyroTs);
+            imuMsg.angular_velocity.x = gyroValues.x;
+            imuMsg.angular_velocity.y = gyroValues.y;
+            imuMsg.angular_velocity.z = gyroValues.z;
 
-        imuMsg.angular_velocity.x = gyroValues.x;
-        imuMsg.angular_velocity.y = gyroValues.y;
-        imuMsg.angular_velocity.z = gyroValues.z;
+            imuMsg.linear_acceleration.x = acceleroValues.x;
+            imuMsg.linear_acceleration.y = acceleroValues.y;
+            imuMsg.linear_acceleration.z = acceleroValues.z;
 
-        imuMsg.linear_acceleration.x = acceleroValues.x;
-        imuMsg.linear_acceleration.y = acceleroValues.y;
-        imuMsg.linear_acceleration.z = acceleroValues.z;
+            m_imuPub->publish(imuMsg);
+        }
 
-        m_imuPub->publish(imuMsg);
+        
 
         // printf("Accelerometer timestamp: %ld ms\n", static_cast<long>(acceleroTs.time_since_epoch().count()));
         // printf("Accelerometer [m/s^2]: x: %.3f y: %.3f z: %.3f \n", acceleroValues.x, acceleroValues.y, acceleroValues.z);
