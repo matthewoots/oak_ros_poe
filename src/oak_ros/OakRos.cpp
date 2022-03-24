@@ -224,7 +224,9 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params)
     
     dai::UsbSpeed usbSpeed = m_device->getUsbSpeed();
 
-    if (usbSpeed < dai::UsbSpeed::SUPER){
+    if (usbSpeed == dai::UsbSpeed::UNKNOWN){
+        spdlog::info("{} device created with Ethernet link", m_device_id);
+    }else if (usbSpeed < dai::UsbSpeed::SUPER){
         spdlog::warn("{} device created with speed {}, not USB3, quitting", m_device_id, usbSpeed);
         throw std::runtime_error("USB SPEED NOT USB3");
     }else
