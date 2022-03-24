@@ -51,6 +51,7 @@ int main(int argc, char **argv)
     po::options_description desc ("Oak ROS Wrapper for multiple camera setup, with calibration modes");
 
     int option_frequency;
+    int option_resolution;
     std::string option_exposure_mode;
     bool option_depth;
     std::string option_mesh_dir;
@@ -60,6 +61,7 @@ int main(int argc, char **argv)
     desc.add_options ()
         ("help,h", "print usage message")
         ("frequency,f", po::value(&option_frequency)->default_value(-1, "full-rate"), "set frequency not to be at full rate")
+        ("resolution", po::value(&option_resolution)->default_value(400, "400p"), "set resolution of the camera")
         ("depth,d", po::value(&option_depth)->default_value(false, "false"), "publish depth")
         ("mesh-dir", po::value(&option_mesh_dir)->default_value("", "Empty"))
         ("rectifed,r", po::value(&option_rectified)->default_value(true, "true"), "rectify / undistort stereo image")
@@ -129,7 +131,14 @@ int main(int argc, char **argv)
         params.enable_stereo_rectified = option_rectified;
         params.enable_mesh_dir = option_mesh_dir;
 
-        params.stereo_resolution = dai::MonoCameraProperties::SensorResolution::THE_480_P;
+        if (option_resolution == 480)
+            params.stereo_resolution = dai::MonoCameraProperties::SensorResolution::THE_480_P;
+        else if(option_resolution == 400)
+            params.stereo_resolution = dai::MonoCameraProperties::SensorResolution::THE_400_P;
+        else if(option_resolution == 720)
+            params.stereo_resolution = dai::MonoCameraProperties::SensorResolution::THE_720_P;
+        else
+            throw std::runtime_error("Undefined resolution specified");
 
         handler->init(nh_local, params);
 
