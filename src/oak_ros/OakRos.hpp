@@ -34,6 +34,7 @@ public:
 private:
 
     bool m_running;
+    OakRosParams m_params;
     bool m_stereo_is_rectified;
 
     // 1 means no throttling, only publish every N frames
@@ -54,6 +55,10 @@ private:
 
     std::shared_ptr<dai::DataInputQueue> m_controlQueue;
 
+    // WORKAROUND FOR OV7251, inability to reduce framerate
+    std::shared_ptr<dai::node::Script> m_scriptLeft;
+    std::shared_ptr<dai::node::Script> m_scriptRight;
+
     std::shared_ptr<dai::node::MonoCamera> m_monoLeft, m_monoRight;
     std::shared_ptr<dai::node::StereoDepth> m_stereoDepth;
 
@@ -63,6 +68,17 @@ private:
 
     std::thread m_run;
     void run();
+
+    // the fuctions below is to setup pipeline before m_device
+    void configureRatesWorkaround();
+    std::shared_ptr<dai::node::XLinkIn> configureControl();
+    void configureImu();
+    void configureStereo();
+
+    // the functions below assumes m_device is properly setup
+    void setupControlQueue(std::shared_ptr<dai::node::XLinkIn>);
+    void setupImuQueue();
+    void setupStereoQueue();
 
     void depthCallback(std::shared_ptr<dai::ADatatype> data);
     void imuCallback(std::shared_ptr<dai::ADatatype> data);
