@@ -29,6 +29,9 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params) {
     if (m_params.enable_imu)
         configureImu();
 
+    if (m_params.enable_optical_flow)
+        configureOpticalFlow();
+
     auto xinControl = configureControl();
 
     // Initialise device
@@ -64,6 +67,9 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params) {
     if (m_params.enable_imu) {
         m_imuQueue = m_device->getOutputQueue("imu", 50, false);
     }
+
+    if (m_params.enable_optical_flow)
+        setupOpticalFlowQueue();
 
     setupControlQueue(xinControl);
 
@@ -257,6 +263,57 @@ void OakRos::configureStereo() {
     }
 }
 
+void OakRos::configureOpticalFlow() {
+    m_opticalFlowLeft = m_pipeline.create<dai::node::FeatureTracker>();
+    m_opticalFlowRight = m_pipeline.create<dai::node::FeatureTracker>();
+
+    auto xoutOpticalFlowPassLeft = m_pipeline.create<dai::node::XLinkOut>();
+    auto xoutOpticalFlowPassRight = m_pipeline.create<dai::node::XLinkOut>();
+    auto xoutOpticalFlowLeft = m_pipeline.create<dai::node::XLinkOut>();
+    auto xoutOpticalFlowRight = m_pipeline.create<dai::node::XLinkOut>();
+
+    xoutOpticalFlowPassLeft->setStreamName("opticalFlowPassLeft");
+    xoutOpticalFlowPassRight->setStreamName("opticalFlowPassRight");
+    xoutOpticalFlowLeft->setStreamName("opticalFlowLeft");
+    xoutOpticalFlowRight->setStreamName("opticalFlowRight");
+
+    xoutOpticalFlowPassLeft->setMetadataOnly(true);
+    xoutOpticalFlowPassRight->setMetadataOnly(true);
+
+    // left and right share the same config
+    auto xinConfig = m_pipeline.create<dai::node::XLinkIn>();
+    xinConfig->out.link(m_opticalFlowLeft->inputConfig);
+    xinConfig->out.link(m_opticalFlowRight->inputConfig);
+    xinConfig->setStreamName("opticalFlowConfig");
+
+    // link input images
+    m_monoLeft->out.link(m_opticalFlowLeft->inputImage);
+    m_monoRight->out.link(m_opticalFlowRight->inputImage);
+
+    m_opticalFlowLeft->passthroughInputImage.link(xoutOpticalFlowPassLeft->input);
+    m_opticalFlowRight->passthroughInputImage.link(xoutOpticalFlowPassRight->input);
+
+    m_opticalFlowLeft->outputFeatures.link(xoutOpticalFlowLeft->input);
+    m_opticalFlowRight->outputFeatures.link(xoutOpticalFlowRight->input);
+
+    auto numShaves = 2;
+    auto numMemorySlices = 2;
+    m_opticalFlowLeft->setHardwareResources(numShaves, numMemorySlices);
+    m_opticalFlowRight->setHardwareResources(numShaves, numMemorySlices);
+
+    // either side will do
+    auto featureTrackerConfig = m_opticalFlowRight->initialConfig.get();
+}
+
+void OakRos::setupOpticalFlowQueue() {
+    m_opticalFlowLeftQueue = m_device->getOutputQueue("opticalFlowLeft", 2, false);
+    m_opticalFlowRightQueue = m_device->getOutputQueue("opticalFlowRight", 2, false);
+    m_opticalFlowLeftPassQueue = m_device->getOutputQueue("opticalFlowPassLeft", 2, false);
+    m_opticalFlowRightPassQueue = m_device->getOutputQueue("opticalFlowPassRight", 2, false);
+
+    m_configOpticalFlowQueue = m_device->getInputQueue("opticalFlowConfig");
+}
+
 void OakRos::setupStereoQueue() {
     m_leftQueue = m_device->getOutputQueue("left", 2, false);
     m_rightQueue = m_device->getOutputQueue("right", 2, false);
@@ -275,7 +332,8 @@ void OakRos::run() {
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     spdlog::info("{} OakRos running now", m_params.device_id);
 
-    dai::DataOutputQueue::CallbackId depthCallbackId, imuCallbackId;
+    dai::DataOutputQueue::CallbackId depthCallbackId, imuCallbackId, opticalFlowLeftCallbackId,
+        opticalFlowRightCallbackId;
 
     if (m_depthQueue.get()) {
         spdlog::info("{} adds depth queue callback", m_params.device_id);
@@ -287,6 +345,14 @@ void OakRos::run() {
         spdlog::info("{} adds imu queue callback", m_params.device_id);
         imuCallbackId =
             m_imuQueue->addCallback(std::bind(&OakRos::imuCallback, this, std::placeholders::_1));
+    }
+
+    if (m_opticalFlowLeftPassQueue.get() && m_opticalFlowRightPassQueue.get()) {
+        spdlog::info("{} adds optical flow queue callbacks", m_params.device_id);
+        // opticalFlowLeftCallbackId = m_opticalFlowLeftPassQueue->addCallback(
+        //     std::bind(&OakRos::opticalFlowPassCallback, this, std::placeholders::_1, 0));
+        opticalFlowRightCallbackId = m_opticalFlowRightPassQueue->addCallback(
+            std::bind(&OakRos::opticalFlowPassCallback, this, std::placeholders::_1, 1));
     }
 
     cv::Mat leftCvFrame, rightCvFrame;
@@ -402,6 +468,11 @@ void OakRos::run() {
     if (m_imuQueue.get())
         m_imuQueue->removeCallback(imuCallbackId);
 
+    if (m_opticalFlowLeftPassQueue.get() && m_opticalFlowRightPassQueue.get()) {
+        // m_opticalFlowLeftPassQueue->removeCallback(opticalFlowLeftCallbackId);
+        m_opticalFlowRightPassQueue->removeCallback(opticalFlowRightCallbackId);
+    }
+
     spdlog::info("{} OakRos quitting", m_params.device_id);
 }
 
@@ -483,6 +554,25 @@ void OakRos::imuCallback(std::shared_ptr<dai::ADatatype> data) {
         // static_cast<long>(gyroTs.time_since_epoch().count())); printf("Gyroscope [rad/s]: x: %.3f
         // y: %.3f z: %.3f \n", gyroValues.x, gyroValues.y, gyroValues.z);
     }
+}
+
+// TODO: right now we only add callback for right camera, and use this to find both frames
+void OakRos::opticalFlowPassCallback(std::shared_ptr<dai::ADatatype> data, int camId)
+{
+    // std::shared_ptr<dai::TrackedFeatures> featuresData = std::static_pointer_cast<dai::TrackedFeatures>(data);
+
+    if (camId != 1)
+        throw std::runtime_error("only need to callback on camera 1, right");
+
+    
+    std::shared_ptr<dai::ImgFrame> rightPassData = std::static_pointer_cast<dai::ImgFrame>(data);
+
+    double tsRight = rightPassData->getTimestamp().time_since_epoch().count() / 1.0e9;
+    int seqRight = rightPassData->getSequenceNum();
+
+    auto featuresRight = m_opticalFlowRightQueue->get<dai::TrackedFeatures>();
+
+    spdlog::info("callback for optical flow for frame {}, ts {}", seqRight, tsRight);
 }
 
 sensor_msgs::CameraInfo OakRos::getCameraInfo(std::shared_ptr<dai::ImgFrame> img,

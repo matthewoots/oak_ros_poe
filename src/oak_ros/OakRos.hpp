@@ -52,8 +52,10 @@ private:
 
     std::shared_ptr<dai::Device> m_device;
     std::shared_ptr<dai::DataOutputQueue> m_leftQueue, m_rightQueue, m_depthQueue, m_rgbQueue, m_imuQueue;
+    std::shared_ptr<dai::DataOutputQueue> m_opticalFlowLeftQueue, m_opticalFlowRightQueue;
+    std::shared_ptr<dai::DataOutputQueue> m_opticalFlowLeftPassQueue, m_opticalFlowRightPassQueue;
 
-    std::shared_ptr<dai::DataInputQueue> m_controlQueue;
+    std::shared_ptr<dai::DataInputQueue> m_controlQueue, m_configOpticalFlowQueue;
 
     // WORKAROUND FOR OV7251, inability to reduce framerate
     std::shared_ptr<dai::node::Script> m_scriptLeft;
@@ -66,6 +68,8 @@ private:
 
     std::shared_ptr<dai::node::IMU> m_imu;
 
+    std::shared_ptr<dai::node::FeatureTracker> m_opticalFlowLeft, m_opticalFlowRight;
+
     std::thread m_run;
     void run();
 
@@ -74,14 +78,17 @@ private:
     std::shared_ptr<dai::node::XLinkIn> configureControl();
     void configureImu();
     void configureStereo();
+    void configureOpticalFlow();
 
     // the functions below assumes m_device is properly setup
     void setupControlQueue(std::shared_ptr<dai::node::XLinkIn>);
     void setupImuQueue();
     void setupStereoQueue();
+    void setupOpticalFlowQueue();
 
     void depthCallback(std::shared_ptr<dai::ADatatype> data);
     void imuCallback(std::shared_ptr<dai::ADatatype> data);
+    void opticalFlowPassCallback(std::shared_ptr<dai::ADatatype> data, int camId);
 
     sensor_msgs::CameraInfo getCameraInfo(std::shared_ptr<dai::ImgFrame> img, dai::CameraBoardSocket socket); // In Oak convention, right camera is the main camera
 

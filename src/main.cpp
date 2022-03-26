@@ -21,7 +21,7 @@ OakRosParams getIndoorLightingParams()
 {
     auto params = getVIOParams();
 
-    params.manual_exposure = 3000; // in usec
+    params.manual_exposure = 2000; // in usec
     params.manual_iso = 200; // 100 to 1600
 
     return params;
@@ -54,6 +54,7 @@ int main(int argc, char **argv)
     int option_resolution;
     std::string option_exposure_mode;
     bool option_depth;
+    bool option_optical_flow;
     std::string option_mesh_dir;
     bool option_rectified;
     bool option_rates_workaround;
@@ -63,6 +64,7 @@ int main(int argc, char **argv)
         ("frequency,f", po::value(&option_frequency)->default_value(-1, "full-rate"), "set frequency not to be at full rate")
         ("resolution", po::value(&option_resolution)->default_value(400, "400p"), "set resolution of the camera")
         ("depth,d", po::value(&option_depth)->default_value(false, "false"), "publish depth")
+        ("optical-flow,o", po::value(&option_optical_flow)->default_value(false, "false"), "publish optical flow")
         ("mesh-dir", po::value(&option_mesh_dir)->default_value("", "Empty"))
         ("rectifed,r", po::value(&option_rectified)->default_value(true, "true"), "rectify / undistort stereo image")
         ("exposure_mode,m", po::value(&option_exposure_mode)->default_value("auto", "auto exposure"), "Exposure mode: auto, indoor, low-light, calibration")
@@ -130,6 +132,7 @@ int main(int argc, char **argv)
         params.rates_workaround = option_rates_workaround;
         params.enable_stereo_rectified = option_rectified;
         params.enable_mesh_dir = option_mesh_dir;
+        params.enable_optical_flow = option_optical_flow;
 
         if (option_resolution == 480)
             params.stereo_resolution = dai::MonoCameraProperties::SensorResolution::THE_480_P;

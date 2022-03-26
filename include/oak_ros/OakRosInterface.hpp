@@ -55,6 +55,8 @@ struct OakRosParams
     bool enable_depth_pointcloud = false;
     // dai::StereoDepthProperties
 
+    bool enable_optical_flow = false;
+
     bool enable_rgb = false;
     std::optional<dai::ColorCameraProperties::SensorResolution> rgb_resolution = {}; // dai::ColorCameraProperties::SensorResolution::THE_1080_P;
 
