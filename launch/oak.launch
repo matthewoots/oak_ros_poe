@@ -1,10 +1,12 @@
 <launch>
     <arg name="vehicle" default="S0"/>
+    <arg name="resolution" value="480"/>
+    <arg name="exposure_mode" value="auto"/>
 
     <node ns="$(arg vehicle)" pkg="oak_ros" type="oak_ros" name="oak_ros" output="screen" respawn="false">
-        <param name="resolution" value="480"/>
+        <param name="resolution" value="$(arg resolution)"/>
         <param name="poe_mode" value="false"/>
         <param name="mesh_dir" type ="string" value="$(find oak_ros)/data"/> 
-        <param name="exposure_mode" type = "string" value="auto"/>
+        <param name="exposure_mode" type = "string" value="$(arg exposure_mode)"/>
     </node>
 </launch>
