@@ -1,7 +1,7 @@
 <launch>
     <arg name="vehicle" default="S0"/>
-    <arg name="resolution" value="480"/>
-    <arg name="exposure_mode" value="auto"/>
+    <arg name="resolution" default="480"/>
+    <arg name="exposure_mode" default="auto"/>
 
     <node ns="$(arg vehicle)" pkg="oak_ros" type="oak_ros" name="oak_ros" output="screen" respawn="false">
         <param name="resolution" value="$(arg resolution)"/>
