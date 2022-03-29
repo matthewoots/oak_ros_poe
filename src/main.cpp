@@ -20,7 +20,7 @@ OakRosParams getIndoorLightingParams()
 {
     auto params = getVIOParams();
 
-    params.manual_exposure = 3000; // in usec
+    params.manual_exposure = 2000; // in usec
     params.manual_iso = 200; // 100 to 1600
 
     return params;
