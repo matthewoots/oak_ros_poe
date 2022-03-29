@@ -323,7 +323,7 @@ void OakRos::run()
                 seqRight = right->getSequenceNum();
             }catch(std::exception& e){
                 spdlog::warn("get() for left or right image failed: {}", e.what());
-                continue;
+                throw std::runtime_error();
             }
             
             try{
@@ -343,7 +343,7 @@ void OakRos::run()
                 }
             }catch(std::exception& e){
                 spdlog::warn("get() for aligning left or right image seq failed: {}", e.what());
-                continue;
+                throw std::runtime_error();
             }
 
             // Here we have make sure the stereo have the same sequence number. According to OAK, this ensures synchronisation
