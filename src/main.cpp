@@ -55,6 +55,8 @@ int main(int argc, char **argv)
     bool option_rectified;
     bool option_rates_workaround;
     bool option_poe_mode;
+    int option_shutter_speed_us;
+    int option_iso;
 
 
     nh_local.param<int>("frequency", option_frequency, -1);
@@ -63,6 +65,8 @@ int main(int argc, char **argv)
     nh_local.param<std::string>("mesh_dir", option_mesh_dir, "");
     nh_local.param<bool>("rectified", option_rectified, true);
     nh_local.param<std::string>("exposure_mode", option_exposure_mode, "auto");
+    nh_local.param<int>("shutter_speed_us", option_shutter_speed_us, 1000);
+    nh_local.param<int>("iso", option_iso, 300);
     nh_local.param<bool>("rates_workaround", option_rates_workaround, true);
     nh_local.param<bool>("poe_mode", option_poe_mode, false);
 
@@ -102,6 +106,13 @@ int main(int argc, char **argv)
                 params = getLowLightParams();
             else if (option_exposure_mode == "indoor")
                 params = getIndoorLightingParams();
+            else if (option_exposure_mode == "manual")
+            {
+                params = getVIOParams();
+
+                params.manual_exposure = option_shutter_speed_us; // in usec
+                params.manual_iso = option_iso; // 100 to 1600
+            }
             else if (option_exposure_mode == "calibration")
             {
                 params = getIndoorLightingParams();
