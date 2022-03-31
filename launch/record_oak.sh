@@ -1,0 +1,2 @@
+#!/bin/bash
+rosbag record --lz4 -b 2048 /oak_ros/oak1/imu /oak_ros/oak1/left/image_rect_raw /oak_ros/oak1/right/image_rect_raw /oak_ros/oak1/left/camera_info /oak_ros/oak1/right/camera_info /oak_ros/oak2/imu /oak_ros/oak2/left/image_rect_raw /oak_ros/oak2/right/image_rect_raw /oak_ros/oak2/left/camera_info /oak_ros/oak2/right/camera_info
