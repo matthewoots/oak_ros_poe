@@ -10,6 +10,11 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params) {
     // ROS-related
     m_nh = nh;
 
+    lastPublishedSeq = 0;
+    lastSeq = 0;
+    lastGyroTs = -1;
+    m_stereo_seq_throttle = 1;
+
     spdlog::info("initialising device {}", m_params.device_id);
 
     m_stereo_is_rectified = false;
@@ -37,6 +42,7 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params) {
             spdlog::info("Creating device without specific id");
             m_device = std::make_shared<dai::Device>(m_pipeline);
         } else {
+            spdlog::info("Creating device with specific id {}", m_params.device_id);
             m_device = std::make_shared<dai::Device>(m_pipeline, getDeviceInfo(m_params.device_id));
         }
 
@@ -272,7 +278,10 @@ void OakRos::setupStereoQueue() {
 void OakRos::run() {
     m_running = true;
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    if (m_watchdog.joinable())
+        m_watchdog.join();
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     spdlog::info("{} OakRos running now", m_params.device_id);
 
     dai::DataOutputQueue::CallbackId depthCallbackId, imuCallbackId;
@@ -292,108 +301,118 @@ void OakRos::run() {
     cv::Mat leftCvFrame, rightCvFrame;
     sensor_msgs::CameraInfo leftCameraInfo, rightCameraInfo;
 
-    while (m_running) {
-        // process stereo data
-        if (m_leftQueue.get() && m_rightQueue.get()) {
-            unsigned int seqLeft, seqRight;
+    try {
+        while (m_running) {
+            // process stereo data
+            if (m_leftQueue.get() && m_rightQueue.get()) {
+                unsigned int seqLeft, seqRight;
 
-            std::shared_ptr<dai::ImgFrame> left, right;
+                std::shared_ptr<dai::ImgFrame> left, right;
 
-            try {
-                left = m_leftQueue->get<dai::ImgFrame>();
-                seqLeft = left->getSequenceNum();
+                try {
+                    left = m_leftQueue->get<dai::ImgFrame>();
+                    seqLeft = left->getSequenceNum();
 
-                right = m_rightQueue->get<dai::ImgFrame>();
-                seqRight = right->getSequenceNum();
-            } catch (std::exception &e) {
-                spdlog::warn("get() for left or right image failed: {}", e.what());
-                throw std::runtime_error("");
-            }
+                    right = m_rightQueue->get<dai::ImgFrame>();
+                    seqRight = right->getSequenceNum();
+                } catch (std::exception &e) {
+                    spdlog::warn("get() for left or right image failed: {}", e.what());
+                    m_watchdog = std::thread(&OakRos::restart, this);
+                    m_running = false;
+                    continue;
+                }
 
-            try {
-                while (seqRight != seqLeft) {
-                    spdlog::warn(
-                        "sequence number mismatch, skip frame. seqLeft = {}, seqRight = {}",
-                        seqLeft, seqRight);
+                try {
+                    while (seqRight != seqLeft) {
+                        spdlog::warn(
+                            "sequence number mismatch, skip frame. seqLeft = {}, seqRight = {}",
+                            seqLeft, seqRight);
 
-                    if (seqRight < seqLeft) {
-                        right = m_rightQueue->get<dai::ImgFrame>();
-                        seqRight = right->getSequenceNum();
+                        if (seqRight < seqLeft) {
+                            right = m_rightQueue->get<dai::ImgFrame>();
+                            seqRight = right->getSequenceNum();
+                        } else {
+                            left = m_leftQueue->get<dai::ImgFrame>();
+                            seqLeft = left->getSequenceNum();
+                        }
+                    }
+                } catch (std::exception &e) {
+                    spdlog::warn("get() for aligning left or right image seq failed: {}", e.what());
+                    m_watchdog = std::thread(&OakRos::restart, this);
+                    m_running = false;
+                    continue;
+                }
+
+                // Here we have make sure the stereo have the same sequence number. According to
+                // OAK, this ensures synchronisation
+
+                // initialise camera_info msgs if needed
+                if (leftCameraInfo.width != left->getWidth() ||
+                    rightCameraInfo.width != right->getWidth()) {
+                    spdlog::info("{} Initialise camera_info messages, rectification = {}",
+                                 m_params.device_id,
+                                 m_stereo_is_rectified ? "Enabled" : "Disabled");
+
+                    if (!m_stereo_is_rectified) {
+                        leftCameraInfo = getCameraInfo(left, dai::CameraBoardSocket::LEFT);
+                        rightCameraInfo = getCameraInfo(right, dai::CameraBoardSocket::RIGHT);
                     } else {
-                        left = m_leftQueue->get<dai::ImgFrame>();
-                        seqLeft = left->getSequenceNum();
+                        leftCameraInfo = getCameraInfo(
+                            right, dai::CameraBoardSocket::RIGHT); // after rectification in OAK,
+                                                                   // the intrinsics of left will be
+                                                                   // the same as the right
+                        rightCameraInfo = getCameraInfo(right, dai::CameraBoardSocket::RIGHT);
                     }
                 }
-            } catch (std::exception &e) {
-                spdlog::warn("get() for aligning left or right image seq failed: {}", e.what());
-                throw std::runtime_error("");
-            }
 
-            // Here we have make sure the stereo have the same sequence number. According to OAK,
-            // this ensures synchronisation
+                if (lastSeq && seqLeft - 3 != lastSeq)
+                    spdlog::warn("jump detected in image frames, from {} to {}, should be to {}",
+                                 lastSeq, seqLeft, lastSeq + 3);
+                lastSeq = seqLeft;
 
-            // initialise camera_info msgs if needed
-            if (leftCameraInfo.width != left->getWidth() ||
-                rightCameraInfo.width != right->getWidth()) {
-                spdlog::info("{} Initialise camera_info messages, rectification = {}",
-                             m_params.device_id, m_stereo_is_rectified ? "Enabled" : "Disabled");
+                if (lastPublishedSeq != 0 && (seqLeft - lastPublishedSeq < m_stereo_seq_throttle))
+                    continue;
 
-                if (!m_stereo_is_rectified) {
-                    leftCameraInfo = getCameraInfo(left, dai::CameraBoardSocket::LEFT);
-                    rightCameraInfo = getCameraInfo(right, dai::CameraBoardSocket::RIGHT);
-                } else {
-                    leftCameraInfo = getCameraInfo(
-                        right, dai::CameraBoardSocket::RIGHT); // after rectification in OAK, the
-                                                               // intrinsics of left will be the
-                                                               // same as the right
-                    rightCameraInfo = getCameraInfo(right, dai::CameraBoardSocket::RIGHT);
+                lastPublishedSeq = seqLeft;
+
+                double tsLeft = left->getTimestamp().time_since_epoch().count() / 1.0e9;
+                double tsRight = right->getTimestamp().time_since_epoch().count() / 1.0e9;
+
+                spdlog::debug("{} left seq = {}, ts = {}", m_params.device_id, seqLeft, tsLeft);
+                spdlog::debug("{} right seq = {}, ts = {}", m_params.device_id, seqRight, tsRight);
+
+                // publish left frame and camera info
+                {
+                    leftCvFrame = left->getFrame();
+
+                    if (m_params.align_ts_to_right)
+                        leftCameraInfo.header.stamp = ros::Time().fromSec(tsRight);
+                    else
+                        leftCameraInfo.header.stamp = ros::Time().fromSec(tsLeft);
+                    cv_bridge::CvImage leftBridge = cv_bridge::CvImage(
+                        leftCameraInfo.header, sensor_msgs::image_encodings::MONO8, leftCvFrame);
+
+                    m_leftPub->publish(*leftBridge.toImageMsg(), leftCameraInfo);
                 }
-            }
 
-            if (lastSeq && seqLeft - 3 != lastSeq)
-                spdlog::warn("jump detected in image frames, from {} to {}, should be to {}",
-                             lastSeq, seqLeft, lastSeq + 3);
-            lastSeq = seqLeft;
+                // publish right frame and camera info
+                {
+                    rightCvFrame = right->getFrame();
 
-            if (lastPublishedSeq != 0 && (seqLeft - lastPublishedSeq < m_stereo_seq_throttle))
-                continue;
+                    rightCameraInfo.header.stamp = ros::Time().fromSec(tsRight);
+                    cv_bridge::CvImage rightBridge = cv_bridge::CvImage(
+                        rightCameraInfo.header, sensor_msgs::image_encodings::MONO8, rightCvFrame);
 
-            lastPublishedSeq = seqLeft;
+                    m_rightPub->publish(*rightBridge.toImageMsg(), rightCameraInfo);
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
 
-            double tsLeft = left->getTimestamp().time_since_epoch().count() / 1.0e9;
-            double tsRight = right->getTimestamp().time_since_epoch().count() / 1.0e9;
-
-            spdlog::debug("{} left seq = {}, ts = {}", m_params.device_id, seqLeft, tsLeft);
-            spdlog::debug("{} right seq = {}, ts = {}", m_params.device_id, seqRight, tsRight);
-
-            // publish left frame and camera info
-            {
-                leftCvFrame = left->getFrame();
-
-                if (m_params.align_ts_to_right)
-                    leftCameraInfo.header.stamp = ros::Time().fromSec(tsRight);
-                else
-                    leftCameraInfo.header.stamp = ros::Time().fromSec(tsLeft);
-                cv_bridge::CvImage leftBridge = cv_bridge::CvImage(
-                    leftCameraInfo.header, sensor_msgs::image_encodings::MONO8, leftCvFrame);
-
-                m_leftPub->publish(*leftBridge.toImageMsg(), leftCameraInfo);
-            }
-
-            // publish right frame and camera info
-            {
-                rightCvFrame = right->getFrame();
-
-                rightCameraInfo.header.stamp = ros::Time().fromSec(tsRight);
-                cv_bridge::CvImage rightBridge = cv_bridge::CvImage(
-                    rightCameraInfo.header, sensor_msgs::image_encodings::MONO8, rightCvFrame);
-
-                m_rightPub->publish(*rightBridge.toImageMsg(), rightCameraInfo);
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(2));
-
-        } else
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            } else
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+    } catch (std::exception &e) {
+        spdlog::warn("while(m_running) failed: {}", e.what());
+        m_watchdog = std::thread(&OakRos::restart, this);
     }
 
     if (m_depthQueue.get())
