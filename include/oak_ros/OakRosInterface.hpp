@@ -43,6 +43,8 @@ struct OakRosParams
     std::string device_id;
     std::string topic_name = "oak";
 
+    bool only_usb2_mode = false;
+
     bool enable_stereo = true;
     bool enable_stereo_rectified = true;
     std::string enable_mesh_dir; 

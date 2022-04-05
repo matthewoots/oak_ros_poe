@@ -38,22 +38,29 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params) {
 
     // Initialise device
     {
+        dai::UsbSpeed usbSpeedMax;
+
+        if (m_params.only_usb2_mode)
+            usbSpeedMax = dai::UsbSpeed::HIGH;
+        else
+            usbSpeedMax = dai::UsbSpeed::SUPER;
+        
         if (m_params.device_id.empty()) {
             spdlog::info("Creating device without specific id");
-            m_device = std::make_shared<dai::Device>(m_pipeline);
+            m_device = std::make_shared<dai::Device>(m_pipeline, usbSpeedMax);
         } else {
             spdlog::info("Creating device with specific id {}", m_params.device_id);
-            m_device = std::make_shared<dai::Device>(m_pipeline, getDeviceInfo(m_params.device_id));
+            m_device = std::make_shared<dai::Device>(m_pipeline, getDeviceInfo(m_params.device_id), usbSpeedMax);
         }
 
         dai::UsbSpeed usbSpeed = m_device->getUsbSpeed();
 
         if (usbSpeed == dai::UsbSpeed::UNKNOWN) {
             spdlog::info("{} device created with Ethernet link", m_params.device_id);
-        } else if (usbSpeed < dai::UsbSpeed::SUPER) {
-            spdlog::warn("{} device created with speed {}, not USB3, quitting", m_params.device_id,
-                         usbSpeed);
-            throw std::runtime_error("USB SPEED NOT USB3");
+        } else if (usbSpeed != usbSpeedMax) {
+            spdlog::warn("{} device created with speed {}, not {}, quitting", m_params.device_id,
+                         usbSpeed, usbSpeedMax);
+            throw std::runtime_error("USB SPEED NOT CORRECT");
         } else
             spdlog::info("{} device created with speed {}", m_params.device_id, usbSpeed);
     }

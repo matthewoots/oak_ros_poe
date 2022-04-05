@@ -55,6 +55,7 @@ int main(int argc, char **argv)
     bool option_rectified;
     bool option_rates_workaround;
     bool option_poe_mode;
+    bool option_only_usb2_mode;
     int option_shutter_speed_us;
     int option_iso;
 
@@ -69,6 +70,8 @@ int main(int argc, char **argv)
     nh_local.param<int>("iso", option_iso, 300);
     nh_local.param<bool>("rates_workaround", option_rates_workaround, true);
     nh_local.param<bool>("poe_mode", option_poe_mode, false);
+    nh_local.param<bool>("only_usb2_mode", option_only_usb2_mode, false);
+
 
 
     auto device_ids = OakRosFactory::getAllAvailableDeviceIds();
@@ -134,6 +137,8 @@ int main(int argc, char **argv)
             }
                 
         }
+
+        params.only_usb2_mode = option_only_usb2_mode;
 
         params.enable_depth = option_depth;
         
