@@ -58,6 +58,7 @@ int main(int argc, char **argv)
     bool option_only_usb2_mode;
     int option_shutter_speed_us;
     int option_iso;
+    int option_exposure_compensation;
 
 
     nh_local.param<int>("frequency", option_frequency, -1);
@@ -68,6 +69,7 @@ int main(int argc, char **argv)
     nh_local.param<std::string>("exposure_mode", option_exposure_mode, "auto");
     nh_local.param<int>("shutter_speed_us", option_shutter_speed_us, 1000);
     nh_local.param<int>("iso", option_iso, 300);
+    nh_local.param<int>("exposure_compensation", option_exposure_compensation, 0);
     nh_local.param<bool>("rates_workaround", option_rates_workaround, true);
     nh_local.param<bool>("poe_mode", option_poe_mode, false);
     nh_local.param<bool>("only_usb2_mode", option_only_usb2_mode, false);
@@ -137,6 +139,8 @@ int main(int argc, char **argv)
             }
                 
         }
+        
+        params.exposure_compensation = option_exposure_compensation;
 
         params.only_usb2_mode = option_only_usb2_mode;
 

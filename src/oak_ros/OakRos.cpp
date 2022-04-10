@@ -132,8 +132,9 @@ void OakRos::setupControlQueue(std::shared_ptr<dai::node::XLinkIn> xinControl) {
         spdlog::info("{} Enable manual exposure = {} and iso = {}", m_params.device_id, exposure,
                      iso);
     } else {
-        spdlog::info("{} Enable auto exposure", m_params.device_id);
+        spdlog::info("{} Enable auto exposure with compesnation {}", m_params.device_id, m_params.exposure_compensation);
         ctrl.setAutoExposureEnable();
+        ctrl.setAutoExposureCompensation(m_params.exposure_compensation);
     }
 
     m_controlQueue->send(ctrl);

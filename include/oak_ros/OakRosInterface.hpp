@@ -68,6 +68,7 @@ struct OakRosParams
 
     std::optional<int> manual_exposure; // 1 - 33000
     std::optional<int> manual_iso; // 100 - 1600
+    int exposure_compensation = 0; // -9 - 9
 
     bool enable_apriltag = false;
 };
