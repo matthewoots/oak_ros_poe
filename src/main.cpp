@@ -59,6 +59,8 @@ int main(int argc, char **argv)
     int option_shutter_speed_us;
     int option_iso;
     int option_exposure_compensation;
+    int option_ir_laser_dot;
+    int option_ir_floodlight;
 
 
     nh_local.param<int>("frequency", option_frequency, -1);
@@ -70,6 +72,8 @@ int main(int argc, char **argv)
     nh_local.param<int>("shutter_speed_us", option_shutter_speed_us, 1000);
     nh_local.param<int>("iso", option_iso, 300);
     nh_local.param<int>("exposure_compensation", option_exposure_compensation, 0);
+    nh_local.param<int>("ir_laser_dot", option_ir_laser_dot, 0);
+    nh_local.param<int>("ir_floodlight", option_ir_floodlight, 0);
     nh_local.param<bool>("rates_workaround", option_rates_workaround, true);
     nh_local.param<bool>("poe_mode", option_poe_mode, false);
     nh_local.param<bool>("only_usb2_mode", option_only_usb2_mode, false);
@@ -141,6 +145,8 @@ int main(int argc, char **argv)
         }
         
         params.exposure_compensation = option_exposure_compensation;
+        params.ir_laser_dot = option_ir_laser_dot;
+        params.ir_floodlight = option_ir_floodlight;
 
         params.only_usb2_mode = option_only_usb2_mode;
 

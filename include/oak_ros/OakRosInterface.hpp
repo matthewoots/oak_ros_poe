@@ -70,6 +70,9 @@ struct OakRosParams
     std::optional<int> manual_iso; // 100 - 1600
     int exposure_compensation = 0; // -9 - 9
 
+    int ir_laser_dot = 0; // in mA: 0 - 1200
+    int ir_floodlight = 0; // in mA: 0 - 1500
+
     bool enable_apriltag = false;
 };
 

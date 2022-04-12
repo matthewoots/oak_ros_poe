@@ -65,6 +65,20 @@ void OakRos::init(const ros::NodeHandle &nh, const OakRosParams &params) {
             spdlog::info("{} device created with speed {}", m_params.device_id, usbSpeed);
     }
 
+    // setup lights
+
+    {
+        if (m_params.ir_laser_dot > 0) {
+            spdlog::info("Enable IR laser dot projection with {} mA", m_params.ir_laser_dot);
+            m_device->setIrLaserDotProjectorBrightness(m_params.ir_laser_dot);
+        }
+
+        if (m_params.ir_floodlight > 0) {
+            spdlog::info("Enable IR floodlight with {} mA", m_params.ir_floodlight);
+            m_device->setIrFloodLightBrightness(m_params.ir_floodlight);
+        }
+    }
+
     // setup queues
 
     if (m_params.enable_stereo)
