@@ -12,6 +12,11 @@ parser.add_argument('calibBackUpFile', nargs='?', help="Path to V6 calibration f
 args = parser.parse_args()
 
 # Connect device
+
+(found, info) = dai.DeviceBootloader.getFirstAvailableDevice()
+print(found)
+
+
 with dai.Device() as device:
 
     deviceCalib = device.readCalibration()

@@ -1,0 +1,4 @@
+<launch>
+	<node pkg="oak_ros" type="oak_ros" name="oak_ros_poe" output="screen" 
+	args="--mesh-dir /home/nvidia/floam_ws/src/oak_ros/data/ --resolution 720"/>
+</launch>

@@ -19,6 +19,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 find_package(Threads REQUIRED)
+
 find_package(OpenCV 4 REQUIRED)
 
 find_package(Boost REQUIRED COMPONENTS program_options)
@@ -48,8 +49,9 @@ endif()
 include_directories(include ${catkin_INCLUDE_DIRS})
 
 add_library(lib_oak_ros src/oak_ros/OakRos.cpp src/oak_ros/OakRosFactory.cpp)
-target_link_libraries(lib_oak_ros PUBLIC depthai::opencv ${catkin_LIBRARIES} Threads::Threads)
+target_link_libraries(lib_oak_ros PUBLIC depthai::opencv ${OpenCV_LIBS} ${catkin_LIBRARIES} Threads::Threads)
 
+# depthai::opencv
 # alias will make public dependencies go through
 add_library(lib_oak_ros::lib_oak_ros ALIAS lib_oak_ros)
 
@@ -61,11 +63,15 @@ PRIVATE
 lib_oak_ros::lib_oak_ros Threads::Threads
 )
 
+message(STATUS "${OpenCV_LIBS} ======================= opencv")
+message(STATUS "${OpenCV_INCLUDE_DIRS} ======================= opencv")
+
 add_executable(test_stereo_depth_video test/test_stereo_depth_video.cpp)
 target_link_libraries(test_stereo_depth_video 
 PRIVATE
 lib_oak_ros::lib_oak_ros
 Threads::Threads
+${OpenCV_LIBS}
 )
 
 add_executable(test_calibration_reader test/test_calibration_reader.cpp)

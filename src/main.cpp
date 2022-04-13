@@ -32,8 +32,8 @@ OakRosParams getLowLightParams()
 {
     auto params = getVIOParams();
 
-    params.manual_exposure = 8000; // in usec
-    params.manual_iso = 1600; // 100 to 1600
+    params.manual_exposure = 12000; // in usec
+    params.manual_iso = 800; // 100 to 1600
 
     return params;
 }
