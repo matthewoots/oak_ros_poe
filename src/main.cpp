@@ -75,7 +75,7 @@ int main(int argc, char **argv)
     nh_local.param<int>("ir_laser_dot", option_ir_laser_dot, 0);
     nh_local.param<int>("ir_floodlight", option_ir_floodlight, 0);
     nh_local.param<bool>("rates_workaround", option_rates_workaround, true);
-    nh_local.param<bool>("poe_mode", option_poe_mode, false);
+    nh_local.param<bool>("poe_mode", option_poe_mode, true);
     nh_local.param<bool>("only_usb2_mode", option_only_usb2_mode, false);
 
 
