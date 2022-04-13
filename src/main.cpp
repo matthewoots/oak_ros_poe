@@ -2,7 +2,6 @@
 
 #include <spdlog/spdlog.h>
 
-#include <boost/program_options.hpp>
 
 // Preset good for indoor calibration
 
@@ -21,7 +20,7 @@ OakRosParams getIndoorLightingParams()
 {
     auto params = getVIOParams();
 
-    params.manual_exposure = 3000; // in usec
+    params.manual_exposure = 2000; // in usec
     params.manual_iso = 200; // 100 to 1600
 
     return params;
@@ -38,7 +37,6 @@ OakRosParams getLowLightParams()
     return params;
 }
 
-namespace po = boost::program_options;
 
 int main(int argc, char **argv)
 {
@@ -48,7 +46,6 @@ int main(int argc, char **argv)
     ros::NodeHandle nh;
     ros::NodeHandle nh_local("~");
 
-    po::options_description desc ("Oak ROS Wrapper for multiple camera setup, with calibration modes");
 
     int option_frequency;
     int option_resolution;
@@ -57,26 +54,31 @@ int main(int argc, char **argv)
     std::string option_mesh_dir;
     bool option_rectified;
     bool option_rates_workaround;
+    bool option_poe_mode;
+    bool option_only_usb2_mode;
+    int option_shutter_speed_us;
+    int option_iso;
+    int option_exposure_compensation;
+    int option_ir_laser_dot;
+    int option_ir_floodlight;
 
-    desc.add_options ()
-        ("help,h", "print usage message")
-        ("frequency,f", po::value(&option_frequency)->default_value(-1, "full-rate"), "set frequency not to be at full rate")
-        ("resolution", po::value(&option_resolution)->default_value(400, "400p"), "set resolution of the camera")
-        ("depth,d", po::value(&option_depth)->default_value(false, "false"), "publish depth")
-        ("mesh-dir", po::value(&option_mesh_dir)->default_value("", "Empty"))
-        ("rectifed,r", po::value(&option_rectified)->default_value(true, "true"), "rectify / undistort stereo image")
-        ("exposure_mode,m", po::value(&option_exposure_mode)->default_value("auto", "auto exposure"), "Exposure mode: auto, indoor, low-light, calibration")
-        ("rates-workaround", po::value(&option_rates_workaround)->default_value(true, "true"), "Enable to half the rates of OV7251 sensor, and use alternative rate control")
-        ;
 
-    po::variables_map vm;
-    po::store (po::command_line_parser (argc, argv).options (desc).run (), vm);
-    po::notify (vm);
+    nh_local.param<int>("frequency", option_frequency, -1);
+    nh_local.param<int>("resolution", option_resolution, 480);
+    nh_local.param<bool>("depth", option_depth, false);
+    nh_local.param<std::string>("mesh_dir", option_mesh_dir, "");
+    nh_local.param<bool>("rectified", option_rectified, true);
+    nh_local.param<std::string>("exposure_mode", option_exposure_mode, "auto");
+    nh_local.param<int>("shutter_speed_us", option_shutter_speed_us, 1000);
+    nh_local.param<int>("iso", option_iso, 300);
+    nh_local.param<int>("exposure_compensation", option_exposure_compensation, 0);
+    nh_local.param<int>("ir_laser_dot", option_ir_laser_dot, 0);
+    nh_local.param<int>("ir_floodlight", option_ir_floodlight, 0);
+    nh_local.param<bool>("rates_workaround", option_rates_workaround, true);
+    nh_local.param<bool>("poe_mode", option_poe_mode, false);
+    nh_local.param<bool>("only_usb2_mode", option_only_usb2_mode, false);
 
-    if (vm.count("help")) {  
-        std::cout << desc << "\n";
-        return 0;
-    }
+
 
     auto device_ids = OakRosFactory::getAllAvailableDeviceIds();
 
@@ -85,6 +87,19 @@ int main(int argc, char **argv)
     size_t topic_name_seq = 1;
     for (auto& id : device_ids)
     {
+        bool isPoeDevice = (id.compare(0, 4, "192.") == 0);
+
+        if (option_poe_mode){
+            if (!isPoeDevice){
+                spdlog::info("{} is not a POE device, skipping", id);
+                continue;
+            }              
+        }else{
+            if (isPoeDevice){
+                spdlog::info("{} is a POE device, skipping", id);
+                continue;
+            }
+        }
         spdlog::info("main: start device with id {}", id);
         
         OakRosInterface::Ptr handler = oak_handlers.emplace_back(OakRosFactory::getOakRosHandler());
@@ -100,6 +115,13 @@ int main(int argc, char **argv)
                 params = getLowLightParams();
             else if (option_exposure_mode == "indoor")
                 params = getIndoorLightingParams();
+            else if (option_exposure_mode == "manual")
+            {
+                params = getVIOParams();
+
+                params.manual_exposure = option_shutter_speed_us; // in usec
+                params.manual_iso = option_iso; // 100 to 1600
+            }
             else if (option_exposure_mode == "calibration")
             {
                 params = getIndoorLightingParams();
@@ -121,6 +143,12 @@ int main(int argc, char **argv)
             }
                 
         }
+        
+        params.exposure_compensation = option_exposure_compensation;
+        params.ir_laser_dot = option_ir_laser_dot;
+        params.ir_floodlight = option_ir_floodlight;
+
+        params.only_usb2_mode = option_only_usb2_mode;
 
         params.enable_depth = option_depth;
         

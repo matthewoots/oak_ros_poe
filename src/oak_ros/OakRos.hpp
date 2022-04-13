@@ -18,29 +18,58 @@ class OakRos : public OakRosInterface
 public:
     void init(const ros::NodeHandle &nh, const OakRosParams &params);
 
-    static std::vector<std::string> getAllAvailableDeviceIds();
-
-    dai::DeviceInfo getDeviceInfo(const std::string& device_id);
-
-    ~OakRos(){
+    void deinit(){
         m_running = false;
 
         if (m_run.joinable())
             m_run.join();
 
+        m_imageTransport.reset();
+        m_leftPub.reset();
+        m_rightPub.reset();
+        m_imuPub.reset();
+
+        m_device.reset();
+
+        m_pipeline = dai::Pipeline();
+    }
+
+    void restart(){
+        restartCount++;
+
+        // if (restartCount > 2){
+        //     throw std::runtime_error("Too many restart attempted, failed to recover");
+        // }
+
+        spdlog::warn("restarting oak camera {}", m_params.device_id);
+        deinit();
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        init(m_nh, m_params);
+        spdlog::warn("restarting compeleted for camera {}", m_params.device_id);
+    }
+
+    static std::vector<std::string> getAllAvailableDeviceIds();
+
+    dai::DeviceInfo getDeviceInfo(const std::string& device_id);
+
+    ~OakRos(){
+        deinit();
         spdlog::info("{} OakRos class destructor done.", m_device_id);
     }
 
 private:
 
     bool m_running;
+    OakRosParams m_params;
     bool m_stereo_is_rectified;
 
+    int restartCount = 0;
+
     // 1 means no throttling, only publish every N frames
-    unsigned int m_stereo_seq_throttle = 1;
-    unsigned int lastSeq = 0;
-    unsigned int lastPublishedSeq = 0;
-    double lastGyroTs = -1;
+    unsigned int m_stereo_seq_throttle;
+    unsigned int lastSeq;
+    unsigned int lastPublishedSeq;
+    double lastGyroTs;
     
     bool m_ts_align_to_right;
 
@@ -54,6 +83,10 @@ private:
 
     std::shared_ptr<dai::DataInputQueue> m_controlQueue;
 
+    // WORKAROUND FOR OV7251, inability to reduce framerate
+    std::shared_ptr<dai::node::Script> m_scriptLeft;
+    std::shared_ptr<dai::node::Script> m_scriptRight;
+
     std::shared_ptr<dai::node::MonoCamera> m_monoLeft, m_monoRight;
     std::shared_ptr<dai::node::StereoDepth> m_stereoDepth;
 
@@ -61,8 +94,19 @@ private:
 
     std::shared_ptr<dai::node::IMU> m_imu;
 
-    std::thread m_run;
+    std::thread m_run, m_watchdog;
     void run();
+
+    // the fuctions below is to setup pipeline before m_device
+    void configureRatesWorkaround();
+    std::shared_ptr<dai::node::XLinkIn> configureControl();
+    void configureImu();
+    void configureStereo();
+
+    // the functions below assumes m_device is properly setup
+    void setupControlQueue(std::shared_ptr<dai::node::XLinkIn>);
+    void setupImuQueue();
+    void setupStereoQueue();
 
     void depthCallback(std::shared_ptr<dai::ADatatype> data);
     void imuCallback(std::shared_ptr<dai::ADatatype> data);

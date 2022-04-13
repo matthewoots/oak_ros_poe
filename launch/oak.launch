@@ -1,0 +1,24 @@
+<launch>
+    <arg name="_uav_id" value="$(env UAV_GROUPNAME)" />
+    <arg name="vehicle" default="$(arg _uav_id)"/>
+    <arg name="resolution" default="480"/>
+    <arg name="exposure_mode" default="auto"/>
+    <arg name="shutter_speed_us" default="12000"/>
+    <arg name="iso" default="600"/>
+    <arg name="exposure_compensation" default="-4"/>
+    <arg name="ir_laser_dot" default="0"/>
+    <arg name="ir_floodlight" default="0"/>
+
+    <node ns="$(arg vehicle)" pkg="oak_ros" type="oak_ros" name="oak_ros" output="screen" respawn="false">
+        <param name="resolution" value="$(arg resolution)"/>
+        <param name="poe_mode" value="false"/>
+        <param name="only_usb2_mode" value="true"/>
+        <param name="mesh_dir" type ="string" value="$(find oak_ros)/data"/> 
+        <param name="exposure_mode" type = "string" value="$(arg exposure_mode)"/>
+        <param name="shutter_speed_us" value="$(arg shutter_speed_us)"/>
+        <param name="iso" value="$(arg iso)"/>
+        <param name="exposure_compensation" value="$(arg exposure_compensation)"/>
+        <param name="ir_laser_dot" value="$(arg ir_laser_dot)"/>
+        <param name="ir_floodlight" value="$(arg ir_floodlight)"/>
+    </node>
+</launch>

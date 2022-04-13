@@ -43,6 +43,8 @@ struct OakRosParams
     std::string device_id;
     std::string topic_name = "oak";
 
+    bool only_usb2_mode = false;
+
     bool enable_stereo = true;
     bool enable_stereo_rectified = true;
     std::string enable_mesh_dir; 
@@ -66,6 +68,10 @@ struct OakRosParams
 
     std::optional<int> manual_exposure; // 1 - 33000
     std::optional<int> manual_iso; // 100 - 1600
+    int exposure_compensation = 0; // -9 - 9
+
+    int ir_laser_dot = 0; // in mA: 0 - 1200
+    int ir_floodlight = 0; // in mA: 0 - 1500
 
     bool enable_apriltag = false;
 };
